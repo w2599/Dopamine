@@ -12,3 +12,4 @@ Application/Payload
 Tools/fastPathSign/.build_*
 Exploits/kfd/kfd.framework/kfd
 .sign
+BaseBin/opainject
