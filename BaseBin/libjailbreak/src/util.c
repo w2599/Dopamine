@@ -9,8 +9,8 @@
 #include <signal.h>
 #include <dlfcn.h>
 #include <sys/sysctl.h>
-#include <archive.h>
-#include <archive_entry.h>
+#include <libarchive/archive.h>
+#include <libarchive/archive_entry.h>
 #include <math.h>
 #include <mach-o/dyld.h>
 #include <dirent.h>
