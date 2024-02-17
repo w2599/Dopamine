@@ -6,6 +6,24 @@
 		<key>key</key>
 		<string>default</string>
 		<key>name</key>
+		<string>Xiuxian</string>
+		<key>image</key>
+		<string>Background_Purple.jpg</string>
+		<key>actionMenuColor</key>
+		<string>4F150C71</string>
+		<key>windowColor</key>
+		<string>6008040A</string>
+		<key>blur</key>
+		<integer>9</integer>
+		<key>titleShadow</key>
+		<true/>
+	</dict>
+	<dict>
+		<key>key</key>
+		<string>dopamine</string>
+		<key>icon</key>
+		<string>AppIcon_Dopa</string>
+		<key>name</key>
 		<string>Dopamine</string>
 		<key>image</key>
 		<string>Background_Green.jpg</string>

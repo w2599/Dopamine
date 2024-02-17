@@ -18,7 +18,7 @@
     {
         [self setDelegate:delegate];
         [self setActions:actions];
-        self.backgroundColor = [DOThemeManager menuColorWithAlpha:1.0];
+        self.backgroundColor = [DOThemeManager menuColorWithAlpha:0.3];
         self.layer.cornerRadius = 14;
         self.layer.masksToBounds = YES;
         self.layer.cornerCurve = kCACornerCurveContinuous;

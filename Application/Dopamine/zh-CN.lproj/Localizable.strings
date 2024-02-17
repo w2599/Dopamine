@@ -116,12 +116,7 @@
 
 // mount 
 "Input_Mmount_Title" = "新增挂载";
-"Input_Mount_Title_B" = "输入原始路径";
-"Input_Mount_Path" = "输入原始路径";
-"Button_Mount" = "确定";
-
 "Input_Unmount_Title" = "取消挂载";
-"Input_Unmount_Title_B" = "输入原始路径";
-"Input_Unmount_Path" = "输入原始路径";
-"Button_Unmount" = "确定";
+"Input_Mount_Title" = "输入原始路径";
+"Button_Mount" = "确定";
 

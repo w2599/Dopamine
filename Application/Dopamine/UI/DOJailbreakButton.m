@@ -144,9 +144,11 @@
 {
     UIWindow *window = [[UIApplication sharedApplication] keyWindow];
 
+    BOOL xxFlag = [[[DOThemeManager sharedInstance] enabledTheme].name isEqualToString:@"Xiuxian"] ? YES : NO;
+
     UILabel *titleLabel = [[UILabel alloc] init];
     titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    titleLabel.text = DOLocalizedString(@"Status_Title_Jailbreaking");
+    titleLabel.text = DOLocalizedString(xxFlag ? @"渡劫中" : @"Status_Title_Jailbreaking");
     titleLabel.textColor = [UIColor whiteColor];
     titleLabel.font = [UIFont systemFontOfSize:18 weight:UIFontWeightRegular];
     titleLabel.textAlignment = NSTextAlignmentCenter;

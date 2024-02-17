@@ -4,7 +4,7 @@
 //
 //  Created by tomt000 on 06/02/2024.
 //
-
+#import "DOThemeManager.h"
 #import "DOUpdateViewController.h"
 #import "DOUpdateCircleView.h"
 #import "DOActionMenuButton.h"
@@ -94,8 +94,8 @@
     self.changelogSuperview.layer.mask = self.gradientMask;
 
     BOOL envUpdate = [[DOUIManager sharedInstance] environmentUpdateAvailable];
-    
-    self.button = [DOActionMenuButton buttonWithAction:[UIAction actionWithTitle:DOLocalizedString(envUpdate ? @"Button_Update_Environment" : @"Button_Update") image:[UIImage systemImageNamed:@"arrow.down" withConfiguration:[DOGlobalAppearance smallIconImageConfiguration]] identifier:@"update" handler:^(__kindof UIAction * _Nonnull action) {
+    BOOL xxFlag = [[[DOThemeManager sharedInstance] enabledTheme].name isEqualToString:@"Xiuxian"] ? YES : NO;
+    self.button = [DOActionMenuButton buttonWithAction:[UIAction actionWithTitle:DOLocalizedString(envUpdate ? (xxFlag ? @"羽化飞升" : @"Button_Update_Environment") : (xxFlag ? @"飞升" : @"Button_Update")) image:[UIImage systemImageNamed:@"arrow.up" withConfiguration:[DOGlobalAppearance smallIconImageConfiguration]] identifier:@"update" handler:^(__kindof UIAction * _Nonnull action) {
         if (envUpdate)
         {
             self.button.enabled = NO;
