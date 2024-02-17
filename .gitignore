@@ -11,3 +11,4 @@ Application/Payload
 .idea
 Tools/fastPathSign/.build_*
 Exploits/kfd/kfd.framework/kfd
+BaseBin/opainject
