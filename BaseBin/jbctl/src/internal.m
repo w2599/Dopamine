@@ -147,5 +147,21 @@ int jbctl_handle_internal(const char *command, int argc, char* argv[])
 		}
 		return -1;
 	}
+	else if (!strcmp(command, "mount")) {
+		int ret = 11;
+		// Here we fake a mount
+		printf("Getting kernel ucred...\n");
+		uint64_t orgUcred = 0;
+		if (jbclient_root_steal_ucred(0, &orgUcred) == 0) {
+			// Here we steal the kernel ucred
+			// This allows us to mount to paths that would otherwise be restricted by sandbox
+			printf("Applying mount %s...\n",argv[1]);
+			ret = mount("bindfs", argv[1], MNT_RDONLY, (void *)JBRootPath(argv[1]));
+			// revert
+			printf("Dropping kernel ucred...\n");
+			jbclient_root_steal_ucred(orgUcred, NULL);
+		}
+		return ret;
+	}
 	return -1;
 }
