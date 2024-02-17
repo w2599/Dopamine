@@ -16,3 +16,6 @@ cmake-build-*
 jbupdate.sh
 /BaseBin/roothidehooks/packages
 BaseBin/systemhook/src/roothider_test*
+
+BaseBin/jbupdate.sh
+BaseBin/opainject
