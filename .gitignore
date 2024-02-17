@@ -15,3 +15,5 @@ cmake-build-*
 .vscode
 jbupdate.sh
 
+BaseBin/jbupdate.sh
+BaseBin/opainject
