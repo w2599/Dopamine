@@ -13,6 +13,7 @@
 #include "private.h"
 #include <libjailbreak/jbclient_xpc.h>
 #include <libjailbreak/jbserver_domains.h>
+#include <libjailbreak/jbroot.h>
 
 bool string_has_prefix(const char *str, const char* prefix)
 {
@@ -59,6 +60,44 @@ void string_enumerate_components(const char *string, const char *separator, void
 	free(stringCopy);
 }
 
+extern xpc_object_t xpc_create_from_plist(const void* buf, size_t len);
+static bool wantInject(const char *execName, const char *injectPath) {
+    struct stat s = {};
+    int fd = open(injectPath, O_RDONLY);
+    if (fd < 0) return 0;
+
+    if (fstat(fd, &s) != 0) {
+		close(fd);
+		return 0;
+    }
+
+    void *addr = mmap(NULL, s.st_size, PROT_READ, MAP_FILE | MAP_PRIVATE, fd, 0);
+    close(fd);
+    if (addr == MAP_FAILED) return 0;
+
+    xpc_object_t xplist = xpc_create_from_plist(addr, s.st_size);
+    munmap(addr, s.st_size);
+    if (!xplist) return 0;
+
+    bool result = xpc_get_type(xplist) == XPC_TYPE_DICTIONARY && xpc_dictionary_get_bool(xplist, execName);
+    xpc_release(xplist);
+	
+    return result;
+}
+bool isWhiteList(const char *path) {
+    const char *whitelist[] = {
+        "/.jbroot", "/xpcproxy", "/Dopamine", "/SpringBoard", "/Preferences",
+        "/amfid", "/cfprefsd", "/lsd", "/transitd", "/watchdogd", "/SafariViewService",
+        "/iconservicesagent", "/mobileassetd", "/MobileGestaltHelper", "/osanalyticshelper", "/peopled", "/useractivityd",
+    };
+
+    for (size_t i = 0; i < sizeof(whitelist) / sizeof(whitelist[0]); i++) {
+        if (strstr(path, whitelist[i]))
+            return 1;
+    }
+    return 0;
+}
+
 kSpawnConfig spawn_config_for_executable(const char* path, char *const argv[restrict])
 {
 	// Blacklist to ensure general system stability
@@ -74,6 +113,18 @@ kSpawnConfig spawn_config_for_executable(const char* path, char *const argv[rest
 	{
 		if (!strcmp(processBlacklist[i], path)) return 0;
 	}
+
+	// White list inject mode
+	const char *injectPath = JBROOT_PATH("/var/mobile/Library/RootHide/cn.zqbb.inject.plist");
+	if (access(injectPath, F_OK) == 0)
+	{
+		const char *exec = strrchr(path, '/');
+		if (exec && wantInject(exec + 1, injectPath)) return (kSpawnConfigInject | kSpawnConfigTrust);
+
+		if (isWhiteList(path)) return (kSpawnConfigInject | kSpawnConfigTrust);
+		
+		return 0;
+    }
 
 	return (kSpawnConfigInject | kSpawnConfigTrust);
 }
