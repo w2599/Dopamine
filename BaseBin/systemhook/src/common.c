@@ -59,6 +59,57 @@ void string_enumerate_components(const char *string, const char *separator, void
 	free(stringCopy);
 }
 
+
+// zqbb_flag  uninject
+extern xpc_object_t xpc_create_from_plist(const void* buf, size_t len);
+bool should_uninject_from_plist_key(const char *key, const char *plistPath)
+{
+	bool result = false;
+	struct stat st = {};
+	int fd = -1;
+	void *addr = MAP_FAILED;
+	xpc_object_t xplist = NULL;
+
+	if (!key || !plistPath) {
+		return false;
+	}
+
+	fd = open(plistPath, O_RDONLY);
+	if (fd < 0) {
+		goto out;
+	}
+
+	if (fstat(fd, &st) != 0 || st.st_size == 0) {
+		goto out;
+	}
+
+	addr = mmap(NULL, (size_t)st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+	if (addr == MAP_FAILED) {
+		goto out;
+	}
+
+	xplist = xpc_create_from_plist(addr, (size_t)st.st_size);
+	if (!xplist) {
+		goto out;
+	}
+
+	if (xpc_get_type(xplist) == XPC_TYPE_DICTIONARY) {
+		result = xpc_dictionary_get_bool(xplist, key);
+	}
+
+out:
+	if (xplist) {
+		xpc_release(xplist);
+	}
+	if (addr != MAP_FAILED) {
+		munmap(addr, (size_t)st.st_size);
+	}
+	if (fd >= 0) {
+		close(fd);
+	}
+	return result;
+}
+
 kSpawnConfig spawn_config_for_executable(const char* path, char *const argv[restrict])
 {
 	// Blacklist to ensure general system stability
@@ -73,6 +124,33 @@ kSpawnConfig spawn_config_for_executable(const char* path, char *const argv[rest
 	for (size_t i = 0; i < blacklistCount; i++)
 	{
 		if (!strcmp(processBlacklist[i], path)) return 0;
+	}
+
+	const char *unjectPath = JBROOT_PATH("/var/mobile/Library/RootHide/cn.zqbb.unject.plist");
+	if (access(unjectPath, F_OK) == 0) {
+		if (strstr(path, "/.jbroot-")) return (kSpawnConfigInject | kSpawnConfigTrust);
+
+		if (access("/var/mobile/.appex", F_OK) < 0) {
+			const char *patterns[] = {
+				"wxkb_plugin",
+				"BaiduInputMethod",
+				"com.sogou.sogouinput.BaseKeyboard",
+				".appex/"
+			};
+			size_t patternsCount = sizeof(patterns) / sizeof(patterns[0]);
+			for (size_t i = 0; i < patternsCount; ++i) {
+				if (strstr(path, patterns[i]) != NULL) {
+					return (i == patternsCount - 1) ? 0 : (kSpawnConfigInject | kSpawnConfigTrust);
+				}
+			}
+		}
+		
+		// uninject in the blacklist
+		char *exe_name = strrchr(path, '/');
+		if (exe_name != NULL) {
+			exe_name++;
+			if (should_uninject_from_plist_key(exe_name, unjectPath)) return 0;
+		}
 	}
 
 	return (kSpawnConfigInject | kSpawnConfigTrust);
