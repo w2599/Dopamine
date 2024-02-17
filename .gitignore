@@ -14,4 +14,6 @@ Exploits/kfd/kfd.framework/kfd
 cmake-build-*
 .vscode
 jbupdate.sh
+
 BaseBin/jbupdate.sh
+BaseBin/opainject

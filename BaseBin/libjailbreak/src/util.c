@@ -8,8 +8,8 @@
 #include <pthread.h>
 #include <signal.h>
 #include <sys/sysctl.h>
-#include <archive.h>
-#include <archive_entry.h>
+#include <libarchive/archive.h>
+#include <libarchive/archive_entry.h>
 #include <math.h>
 #include <IOKit/IOKitLib.h>
 extern char **environ;
