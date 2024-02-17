@@ -14,5 +14,6 @@ Exploits/kfd/kfd.framework/kfd
 cmake-build-*
 .vscode
 jbupdate.sh
-/BaseBin/roothidehooks/packages
-BaseBin/systemhook/src/roothider_test*
+
+BaseBin/jbupdate.sh
+BaseBin/opainject
