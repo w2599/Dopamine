@@ -113,3 +113,15 @@
 "Status_Title_Select_Package_Managers" = "请选择包管理器";
 "Select_Package_Managers_Install_Message" = "如果你不确定选择哪一个比较好，请选择 Sileo";
 "Continue" = "继续";
+
+// mount 
+"Input_Mmount_Title" = "新增挂载";
+"Input_Mount_Title_B" = "输入原始路径";
+"Input_Mount_Path" = "输入原始路径";
+"Button_Mount" = "确定";
+
+"Input_Unmount_Title" = "取消挂载";
+"Input_Unmount_Title_B" = "输入原始路径";
+"Input_Unmount_Path" = "输入原始路径";
+"Button_Unmount" = "确定";
+

@@ -162,7 +162,7 @@
         
         PSSpecifier *headerSpecifier = [PSSpecifier emptyGroupSpecifier];
         [headerSpecifier setProperty:@"DOHeaderCell" forKey:@"headerCellClass"];
-        [headerSpecifier setProperty:[NSString stringWithFormat:@"Settings"] forKey:@"title"];
+        [headerSpecifier setProperty:[NSString stringWithFormat:DOLocalizedString(@"Menu_Settings_Title")] forKey:@"title"];
         [specifiers addObject:headerSpecifier];
         
         if (envManager.isSupported) {
@@ -339,6 +339,33 @@
         [themeSpecifier setProperty:@"themeNames" forKey:@"titlesDataSource"];
         [specifiers addObject:themeSpecifier];
         
+        if (envManager.isJailbroken) {
+            PSSpecifier *mountSpecifier = [PSSpecifier emptyGroupSpecifier];
+            mountSpecifier.target = self;
+            [mountSpecifier setProperty:@"Input_Mmount_Title" forKey:@"title"];
+            [mountSpecifier setProperty:@"DOButtonCell" forKey:@"headerCellClass"];
+            [mountSpecifier setProperty:@"doc" forKey:@"image"];
+            [mountSpecifier setProperty:@"mountPressed" forKey:@"action"];
+            [specifiers addObject:mountSpecifier];
+
+            PSSpecifier *unmountSpecifier = [PSSpecifier emptyGroupSpecifier];
+            unmountSpecifier.target = self;
+            [unmountSpecifier setProperty:@"Input_Unmount_Title" forKey:@"title"];
+            [unmountSpecifier setProperty:@"DOButtonCell" forKey:@"headerCellClass"];
+            [unmountSpecifier setProperty:@"trash" forKey:@"image"];
+            [unmountSpecifier setProperty:@"unmountPressed" forKey:@"action"];
+            [specifiers addObject:unmountSpecifier];
+        }
+
+						PSSpecifier *rebootSpecifier = [PSSpecifier emptyGroupSpecifier];
+            rebootSpecifier.target = self;
+            [rebootSpecifier setProperty:@"Button_Reboot" forKey:@"title"];
+            [rebootSpecifier setProperty:@"DOButtonCell" forKey:@"headerCellClass"];
+            [rebootSpecifier setProperty:@"arrow.triangle.2.circlepath" forKey:@"image"];
+            [rebootSpecifier setProperty:@"rebootPressed" forKey:@"action"];
+            [specifiers addObject:rebootSpecifier];
+        
+
         _specifiers = specifiers;
     }
     return _specifiers;
@@ -535,11 +562,103 @@
     [self presentViewController:confirmationAlertController animated:YES completion:nil];
 }
 
+- (void)mountPressed
+{
+ 
+    UIAlertController *inputAlertController = [UIAlertController alertControllerWithTitle:DOLocalizedString(@"Input_Mmount_Title") message:DOLocalizedString(@"Input_Mount_Title") preferredStyle:UIAlertControllerStyleAlert];
+    
+
+    [inputAlertController addTextFieldWithConfigurationHandler:^(UITextField * _Nonnull textField) {
+        textField.placeholder = DOLocalizedString(@"Input_Mount_Title");
+    }];
+    
+    UIAlertAction *mountAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Mount") style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {        // 获取用户输入的Jailbreak路径
+        UITextField *inputTextField = inputAlertController.textFields.firstObject;
+        NSString *mountPath = inputTextField.text;
+        
+        if (mountPath.length > 1) {
+            NSString *plistFilePath = @"/var/mobile/newFakePath.plist";
+            NSMutableDictionary *plistDictionary = [NSMutableDictionary dictionaryWithContentsOfFile:plistFilePath];
+            if (!plistDictionary) {
+                plistDictionary = [NSMutableDictionary dictionary];
+            }
+            NSMutableArray *pathArray = plistDictionary[@"path"];
+            if (!pathArray) {
+                pathArray = [NSMutableArray array];
+            }
+            if (![pathArray containsObject:mountPath]) {
+			          [pathArray addObject:mountPath];
+								[plistDictionary setObject:pathArray forKey:@"path"];
+						 
+                [plistDictionary writeToFile:plistFilePath atomically:YES];
+            } 
+
+            exec_cmd_root(JBROOT_PATH("/basebin/jbctl"), "internal", "mount", [NSURL fileURLWithPath:mountPath].fileSystemRepresentation, NULL);
+
+        }
+    }];
+    
+    UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Cancel") style:UIAlertActionStyleDefault handler:nil];
+
+    [inputAlertController addAction:mountAction];
+    [inputAlertController addAction:cancelAction];
+    
+    [self presentViewController:inputAlertController animated:YES completion:nil];
+}
+
+- (void)unmountPressed
+{
+
+    UIAlertController *inputAlertController = [UIAlertController alertControllerWithTitle:DOLocalizedString(@"Input_Mount_Title") message:DOLocalizedString(@"Input_Mount_Title") preferredStyle:UIAlertControllerStyleAlert];
+    
+    [inputAlertController addTextFieldWithConfigurationHandler:^(UITextField * _Nonnull textField) {
+        textField.placeholder = DOLocalizedString(@"Input_Mount_Title");
+    }];
+    
+    UIAlertAction *mountAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Mount") style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {
+
+        UITextField *inputTextField = inputAlertController.textFields.firstObject;
+        NSString *mountPath = inputTextField.text;
+        NSString *delMountPath = [NSString stringWithFormat:@"%@%@", JBROOT_PATH(@"/mnt"), mountPath];
+        
+	
+        if (mountPath.length > 1) {
+            exec_cmd_root(JBROOT_PATH("/usr/bin/rm"), "-rf", [NSURL fileURLWithPath:delMountPath].fileSystemRepresentation, NULL);
+            exec_cmd_root(JBROOT_PATH("/basebin/jbctl"), "internal", "unmount", [NSURL fileURLWithPath:mountPath].fileSystemRepresentation, NULL);
+
+            NSString *plistPath = @"/var/mobile/newFakePath.plist";
+            NSMutableDictionary *plist = [NSMutableDictionary dictionaryWithContentsOfFile:plistPath];
+            NSMutableArray *paths = plist[@"path"];
+        
+            for (NSInteger index = 0; index < paths.count; index++) {
+                NSString *path = paths[index];
+                if ([path isEqualToString:mountPath]) {
+                    [paths removeObjectAtIndex:index];
+                    plist[@"path"] = paths;
+                    [plist writeToFile:plistPath atomically:YES];
+                }
+            }
+        }
+    }];
+    
+    UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Cancel") style:UIAlertActionStyleDefault handler:nil];
+    
+    [inputAlertController addAction:mountAction];
+    [inputAlertController addAction:cancelAction];
+    
+    [self presentViewController:inputAlertController animated:YES completion:nil];
+}
+
 - (void)resetSettingsPressed
 {
     [[DOUIManager sharedInstance] resetSettings];
     [self.navigationController popToRootViewControllerAnimated:YES];
     [self reloadSpecifiers];
+}
+
+- (void)rebootPressed
+{
+		exec_cmd_root(JBROOT_PATH("/sbin/reboot"), NULL);
 }
 
 
