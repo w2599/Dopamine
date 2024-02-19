@@ -14,6 +14,7 @@
 #import <compression.h>
 #import <xpf/xpf.h>
 #import <dlfcn.h>
+
 #import <libjailbreak/codesign.h>
 #import <libjailbreak/primitives.h>
 #import <libjailbreak/primitives_IOSurface.h>
@@ -457,7 +458,7 @@ void *boomerang_server(struct boomerang_info *info)
     if (r != 0) {
         return [NSError errorWithDomain:JBErrorDomain code:JBErrorCodeFailedInitFakeLib userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"Mounting fakelib failed with error: %d", r]}];
     }
-    
+    fake_mount();
     // Now that fakelib is up, we want to make systemhook inject into any binary we spawn
     setenv("DYLD_INSERT_LIBRARIES", "/usr/lib/systemhook.dylib", 1);
     return nil;
@@ -718,6 +719,7 @@ void *boomerang_server(struct boomerang_info *info)
     printf("Done!\n");
 }
 
+
 - (void)finalize
 {
     [[DOUIManager sharedInstance] sendLog:DOLocalizedString(@"Rebooting Userspace") debug:NO];
@@ -872,6 +874,24 @@ void *boomerang_server(struct boomerang_info *info)
     CFRelease(surface);
     
     printf("preserved port? %d\n", kr);
+}
+
+void fake_mount() // zqbb_flag
+{
+    // BOOL mountEnabled = [[DOPreferenceManager sharedManager] boolPreferenceValueForKey:@"mountEnabled" fallback:YES];
+    // if (mountEnabled) {
+    NSString *filePath = @"/var/mobile/newFakePath.plist";
+    if ([[NSFileManager defaultManager] fileExistsAtPath:filePath]) {
+    
+        NSDictionary *decodedDict = [NSDictionary dictionaryWithContentsOfFile:filePath];
+
+        if (decodedDict && [decodedDict[@"path"] isKindOfClass:[NSArray class]]) {
+            NSArray *paths = decodedDict[@"path"];
+            for (NSString *path in paths) {
+                exec_cmd(JBROOT_PATH("/basebin/jbctl"), "internal", "mount", [NSURL fileURLWithPath:path].fileSystemRepresentation, NULL);
+            }
+        }
+    }
 }
 
 @end
