@@ -117,3 +117,18 @@
 
 "Enable dyld patch" = "启用 dyld 补丁";
 "When spinlock fix is ​​enabled, app extensions of blacklisted apps will be disabled and may also cause spinlock panics when the blacklisted app is in foreground/background.\n\nYou can first try disabling tweak injection for the app in Choicy (spinlock fix still works), and only blacklist the app if that doesn't work." = "启用 spinlock 修复后，黑名单应用的应用扩展将被禁用，并且当黑名单应用处于 前台/后台 时，还可能导致 spinlock 崩溃。\n\n你可以先尝试在 Choicy 中为该应用禁用 tweak 注入（spinlock 修复仍然有效），如果无效，再将该应用加入黑名单。";
+// mount 
+"Input_Mmount_Title" = "新增挂载";
+"Input_Unmount_Title" = "管理挂载";
+"Input_Mount_Title" = "输入原始路径";
+"Error_Mount_Body" = "目标文件夹不存在";
+"Select_Mount_Title" = "选择需要操作的路径";
+"Button_Delete_Path_Only" = "仅删除路径";
+"Button_Delete" = "取消挂载";
+"Button_View" = "Filza查看";
+"Button_Mount" = "确定";
+
+"Input_Unmount_Title_B" = "输入原始路径";
+"Input_Unmount_Path" = "输入原始路径";
+"Button_Unmount" = "确定";
+

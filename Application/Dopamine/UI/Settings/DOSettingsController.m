@@ -171,7 +171,7 @@
         
         PSSpecifier *headerSpecifier = [PSSpecifier emptyGroupSpecifier];
         [headerSpecifier setProperty:@"DOHeaderCell" forKey:@"headerCellClass"];
-        [headerSpecifier setProperty:[NSString stringWithFormat:@"Settings"] forKey:@"title"];
+        [headerSpecifier setProperty:[NSString stringWithFormat:DOLocalizedString(@"Menu_Settings_Title")] forKey:@"title"];
         [specifiers addObject:headerSpecifier];
         
         if (envManager.isSupported) {
@@ -396,6 +396,40 @@
                 [specifiers addObject:_customBootlogoSpecifier];
             }
         }
+
+        
+        if (envManager.isJailbroken) {
+            PSSpecifier *mountGroupSpecifier = [PSSpecifier emptyGroupSpecifier];
+            [specifiers addObject:mountGroupSpecifier];
+
+            PSSpecifier *mountSpecifier = [PSSpecifier preferenceSpecifierNamed:@"" target:self set:defSetter get:defGetter detail:nil cell:PSStaticTextCell edit:nil];
+            [mountSpecifier setProperty:@"Input_Mmount_Title" forKey:@"title"];
+            [mountSpecifier setProperty:[DOButtonCell class] forKey:@"cellClass"];
+            [mountSpecifier setProperty:buttonHeight forKey:@"height"];
+            [mountSpecifier setProperty:@"doc" forKey:@"image"];
+            [mountSpecifier setProperty:@"mountPressed" forKey:@"action"];
+            [specifiers addObject:mountSpecifier];
+
+            PSSpecifier *unmountSpecifier = [PSSpecifier preferenceSpecifierNamed:@"" target:self set:defSetter get:defGetter detail:nil cell:PSStaticTextCell edit:nil];
+            [unmountSpecifier setProperty:@"Input_Unmount_Title" forKey:@"title"];
+            [unmountSpecifier setProperty:[DOButtonCell class] forKey:@"cellClass"];
+            [unmountSpecifier setProperty:buttonHeight forKey:@"height"];
+            [unmountSpecifier setProperty:@"trash" forKey:@"image"];
+            [unmountSpecifier setProperty:@"unmountPressed" forKey:@"action"];
+            [specifiers addObject:unmountSpecifier];
+        }
+
+            PSSpecifier *rebootGroupSpecifier = [PSSpecifier emptyGroupSpecifier];
+            [specifiers addObject:rebootGroupSpecifier];
+
+			PSSpecifier *rebootSpecifier = [PSSpecifier preferenceSpecifierNamed:@"" target:self set:defSetter get:defGetter detail:nil cell:PSStaticTextCell edit:nil];
+            [rebootSpecifier setProperty:@"Button_Reboot" forKey:@"title"];
+            [rebootSpecifier setProperty:[DOButtonCell class] forKey:@"cellClass"];
+            [rebootSpecifier setProperty:buttonHeight forKey:@"height"];
+            [rebootSpecifier setProperty:@"arrow.triangle.2.circlepath" forKey:@"image"];
+            [rebootSpecifier setProperty:@"rebootPressed" forKey:@"action"];
+            [specifiers addObject:rebootSpecifier];
+        
 
         _specifiers = specifiers;
     }
@@ -720,11 +754,190 @@
     [self presentViewController:confirmationAlertController animated:YES completion:nil];
 }
 
+- (NSString *)ensureAbsolutePath:(NSString *)path {
+    NSString *trimmedPath = [path stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    
+    if (![trimmedPath hasPrefix:@"/"]) 
+        trimmedPath = [@"/" stringByAppendingString:trimmedPath];
+
+    return [trimmedPath stringByStandardizingPath];
+}
+
+- (void)mountPressed
+{
+ 
+    UIAlertController *inputAlertController = [UIAlertController alertControllerWithTitle:DOLocalizedString(@"Input_Mmount_Title") message:DOLocalizedString(@"Input_Mount_Title") preferredStyle:UIAlertControllerStyleAlert];
+    
+
+    [inputAlertController addTextFieldWithConfigurationHandler:^(UITextField * _Nonnull textField) {
+        textField.placeholder = DOLocalizedString(@"Input_Mount_Title");
+    }];
+    
+    UIAlertAction *mountAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Mount") style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {
+        UITextField *inputTextField = inputAlertController.textFields.firstObject;
+        NSString *mountPath = [self ensureAbsolutePath:inputTextField.text];
+
+        // 判断路径文件夹是否存在
+        BOOL isDirectory = NO;
+        BOOL isExist = [[NSFileManager defaultManager] fileExistsAtPath:mountPath isDirectory:&isDirectory];
+        if (!isExist || !isDirectory) {
+            UIAlertController *errorAlertController = [UIAlertController alertControllerWithTitle:DOLocalizedString(@"Log_Error") message:DOLocalizedString(@"Error_Mount_Body") preferredStyle:UIAlertControllerStyleAlert];
+            UIAlertAction *okAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Mount") style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+                [self mountPressed];
+            }];
+            [errorAlertController addAction:okAction];
+            [self presentViewController:errorAlertController animated:YES completion:nil];
+            return;
+        }
+        
+        if (mountPath.length > 1) {
+            NSString *mountFilePath = JBROOT_PATH(@"/var/mobile/Library/RootHide/cn.zqbb.mount.rh.plist");
+            
+            // Create directory if it doesn't exist
+            NSString *mountDirectory = [mountFilePath stringByDeletingLastPathComponent];
+            if (![[NSFileManager defaultManager] fileExistsAtPath:mountDirectory]) {
+                [[NSFileManager defaultManager] createDirectoryAtPath:mountDirectory withIntermediateDirectories:YES attributes:nil error:nil];
+            }
+            
+            NSMutableDictionary *plistDictionary = [NSMutableDictionary dictionaryWithContentsOfFile:mountFilePath];
+            if (!plistDictionary) {
+                plistDictionary = [NSMutableDictionary dictionary];
+            }
+            NSMutableArray *pathArray = plistDictionary[@"path"];
+            if (!pathArray) {
+                pathArray = [NSMutableArray array];
+            }
+            if (![pathArray containsObject:mountPath]) {
+			          [pathArray addObject:mountPath];
+								[plistDictionary setObject:pathArray forKey:@"path"];
+						 
+                [plistDictionary writeToFile:mountFilePath atomically:YES];
+            } 
+
+            exec_cmd_root(JBROOT_PATH("/basebin/jbctl"), "internal", "mount", [NSURL fileURLWithPath:mountPath].fileSystemRepresentation, NULL);
+
+        }
+    }];
+    
+    UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Cancel") style:UIAlertActionStyleDefault handler:nil];
+
+    [inputAlertController addAction:mountAction];
+    [inputAlertController addAction:cancelAction];
+    
+    [self presentViewController:inputAlertController animated:YES completion:nil];
+}
+
+- (void)unmountPressed
+{
+    // 读取plist文件中的路径数组
+    NSString *mountPath = JBROOT_PATH(@"/var/mobile/Library/RootHide/cn.zqbb.mount.rh.plist");
+    NSMutableDictionary *plist = [NSMutableDictionary dictionaryWithContentsOfFile:mountPath];
+    NSMutableArray *paths = [plist[@"path"] mutableCopy];
+    
+    // 设置富文本标题
+    NSString *titleText = DOLocalizedString(@"Select_Mount_Title");
+    NSMutableAttributedString *attrTitle = [[NSMutableAttributedString alloc] initWithString:titleText];
+    [attrTitle addAttribute:NSFontAttributeName value:[UIFont boldSystemFontOfSize:24] range:NSMakeRange(0, titleText.length)];
+    
+    // 创建一个UIAlertController作为列表
+    UIAlertController *listAlertController = [UIAlertController alertControllerWithTitle:@"" message:nil preferredStyle:UIAlertControllerStyleActionSheet];
+    
+    // 设置富文本标题到UIAlertController
+    [listAlertController setValue:attrTitle forKey:@"attributedTitle"];
+    
+    for (NSString *path in paths) {
+        UIAlertAction *pathAction = [UIAlertAction actionWithTitle:path style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+            NSString *targetMountPath = [NSString stringWithFormat:@"%@%@", JBROOT_PATH(@"/mnt"), path];
+            
+            // 设置富文本标题
+            NSMutableAttributedString *attrActionTitle = [[NSMutableAttributedString alloc] initWithString:path];
+            [attrActionTitle addAttribute:NSFontAttributeName value:[UIFont boldSystemFontOfSize:12] range:NSMakeRange(0, path.length)];
+    
+            // 创建一个UIAlertController作为列表
+            UIAlertController *actionAlertController = [UIAlertController alertControllerWithTitle:@"" message:nil preferredStyle:UIAlertControllerStyleActionSheet];
+    
+            // 设置富文本标题到UIAlertController
+            [actionAlertController setValue:attrActionTitle forKey:@"attributedTitle"];
+    
+            // 删除路径的操作
+            UIAlertAction *deletePathAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Delete_Path_Only") style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {
+                // 删除plist中的对应路径并保存
+                [paths removeObject:path];
+                plist[@"path"] = paths;
+                [plist writeToFile:mountPath atomically:YES];
+            }];
+            
+            // 删除路径并卸载的操作
+            UIAlertAction *deleteAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Delete") style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {
+                
+                exec_cmd_root(JBROOT_PATH("/usr/bin/rm"), "-rf", [NSURL fileURLWithPath:targetMountPath].fileSystemRepresentation, NULL);
+                exec_cmd_root(JBROOT_PATH("/basebin/jbctl"), "internal", "unmount", [NSURL fileURLWithPath:path].fileSystemRepresentation, NULL);
+                
+                // 删除plist中的对应路径并保存
+                [paths removeObject:path];
+                plist[@"path"] = paths;
+                [plist writeToFile:mountPath atomically:YES];
+            }];
+            
+            UIAlertAction *viewAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_View") style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+                if ([[UIApplication sharedApplication] canOpenURL:[NSURL URLWithString:@"filza://"]]) {
+                    NSURL *filzaURL = [NSURL URLWithString:[@"filza://view" stringByAppendingString:targetMountPath]];
+                    [[UIApplication sharedApplication] openURL:filzaURL options:@{} completionHandler:nil];
+                }else if ([[UIApplication sharedApplication] canOpenURL:[NSURL URLWithString:@"fffff://"]]) {
+                    NSURL *fffffURL = [NSURL URLWithString:[@"fffff://view" stringByAppendingString:targetMountPath]];
+                    [[UIApplication sharedApplication] openURL:fffffURL options:@{} completionHandler:nil];
+                }
+            }];
+            
+            UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Cancel") style:UIAlertActionStyleCancel handler:nil];
+
+            [actionAlertController addAction:deleteAction];
+            [actionAlertController addAction:viewAction];
+            [actionAlertController addAction:deletePathAction]; // 添加仅删除路径的操作
+            [actionAlertController addAction:cancelAction];
+            
+            [self presentViewController:actionAlertController animated:YES completion:nil];
+        }];
+        
+        [listAlertController addAction:pathAction];
+    }
+    
+    UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Cancel") style:UIAlertActionStyleCancel handler:nil];
+    
+    [listAlertController addAction:cancelAction];
+    
+    [self presentViewController:listAlertController animated:YES completion:nil];
+}
+
+
+
 - (void)resetSettingsPressed
 {
     [[DOUIManager sharedInstance] resetSettings];
     [self.navigationController popToRootViewControllerAnimated:YES];
     [self reloadSpecifiers];
+}
+
+- (void)rebootPressed
+{
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:DOLocalizedString(@"Button_Reboot")
+                                                                   message:DOLocalizedString(@"Update_Status_Subtitle_Restart_Soon")
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    
+    UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Cancel")
+                                                             style:UIAlertActionStyleCancel
+                                                           handler:nil];
+    
+    UIAlertAction *rebootAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Reboot")
+                                                             style:UIAlertActionStyleDestructive
+                                                           handler:^(UIAlertAction * _Nonnull action) {
+        exec_cmd_root(JBROOT_PATH("/sbin/reboot"), NULL);
+    }];
+    
+    [alert addAction:cancelAction];
+    [alert addAction:rebootAction];
+    
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 
