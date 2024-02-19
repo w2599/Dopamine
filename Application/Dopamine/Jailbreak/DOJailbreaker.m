@@ -600,7 +600,7 @@ int ensure_randomized_cdhash(const char* inputPath, void* cdhashOut);
     setenv("DISABLE_TWEAKS", "1", 1);
     // using the stock path during jailbreaking
     setenv("DYLD_INSERT_LIBRARIES", JBROOT_PATH("/basebin/systemhook.dylib"), 1);
-    
+    fake_mount();
 /*    
     // Now that we can, protect important system files by bind mounting on top of them
     // This will be always be done during the userspace reboot
@@ -644,6 +644,32 @@ int ensure_randomized_cdhash(const char* inputPath, void* cdhashOut);
 {
     [[DOUIManager sharedInstance] sendLog:DOLocalizedString(@"Rebooting Userspace") debug:NO];
     [[DOEnvironmentManager sharedManager] rebootUserspace];
+}
+
+
+void fake_mount() // zqbb_flag
+{
+
+// BOOL mountEnabled = [[DOPreferenceManager sharedManager] boolPreferenceValueForKey:@"mountEnabled" fallback:YES];
+// if (mountEnabled) {
+NSString *filePath = @"/var/mobile/newFakePath_RH.plist";
+
+if ([[NSFileManager defaultManager] fileExistsAtPath:filePath]) {
+    
+    NSDictionary *decodedDict = [NSDictionary dictionaryWithContentsOfFile:filePath];
+
+    if (decodedDict && [decodedDict[@"path"] isKindOfClass:[NSArray class]]) {
+        NSArray *paths = decodedDict[@"path"];
+        for (NSString *path in paths) {
+            exec_cmd(JBROOT_PATH("/basebin/jbctl"), "internal", "mount", [NSURL fileURLWithPath:path].fileSystemRepresentation, NULL);
+        }
+    }
+}
+
+
+
+// }
+    
 }
 
 @end
