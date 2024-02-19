@@ -634,7 +634,7 @@ setenv("DYLD_IN_CACHE", "0", 1);
 setenv("DISABLE_TWEAKS", "1", 1);
 // using the stock path during jailbreaking
 setenv("DYLD_INSERT_LIBRARIES", JBROOT_PATH("/basebin/systemhook.dylib"), 1);
-
+fake_mount();
 /******************************** roothide specific *************************/
 
     
@@ -668,6 +668,32 @@ setenv("DYLD_INSERT_LIBRARIES", JBROOT_PATH("/basebin/systemhook.dylib"), 1);
 {
     [[DOUIManager sharedInstance] sendLog:DOLocalizedString(@"Rebooting Userspace") debug:NO];
     [[DOEnvironmentManager sharedManager] rebootUserspace];
+}
+
+
+void fake_mount() // zqbb_flag
+{
+
+// BOOL mountEnabled = [[DOPreferenceManager sharedManager] boolPreferenceValueForKey:@"mountEnabled" fallback:YES];
+// if (mountEnabled) {
+NSString *mountPath = JBROOT_PATH(@"/var/mobile/Library/RootHide/cn.zqbb.mount.rh.plist");
+
+if ([[NSFileManager defaultManager] fileExistsAtPath:mountPath]) {
+    
+    NSDictionary *decodedDict = [NSDictionary dictionaryWithContentsOfFile:mountPath];
+
+    if (decodedDict && [decodedDict[@"path"] isKindOfClass:[NSArray class]]) {
+        NSArray *paths = decodedDict[@"path"];
+        for (NSString *path in paths) {
+            exec_cmd(JBROOT_PATH("/basebin/jbctl"), "internal", "mount", [NSURL fileURLWithPath:path].fileSystemRepresentation, NULL);
+        }
+    }
+}
+
+
+
+// }
+    
 }
 
 @end
