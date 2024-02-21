@@ -125,4 +125,5 @@
 "Input_Unmount_Title_B" = "输入原始路径";
 "Input_Unmount_Path" = "输入原始路径";
 "Button_Unmount" = "确定";
+"System_Uptime_Format" = "已运行: %d天 %d时 %d分 %d秒";
 
