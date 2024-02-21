@@ -75,9 +75,10 @@
     //Header
     DOHeaderView *headerView = [[DOHeaderView alloc] initWithImage: [UIImage imageNamed:@"Dopamine"] subtitles: @[
         [DOGlobalAppearance mainSubtitleString:[[DOEnvironmentManager sharedManager] versionSupportString]],
-        [DOGlobalAppearance secondarySubtitleString:DOLocalizedString(@"Credits_Made_By")],
-        [DOGlobalAppearance secondarySubtitleString:DOLocalizedString(@"AAAA")],
-        [DOGlobalAppearance secondarySubtitleString:DOLocalizedString(@"AAAB")]
+        [DOGlobalAppearance secondarySubtitleString:DOLocalizedString(@"Credits_Made_By") withAlpha:0.8],
+        [DOGlobalAppearance secondarySubtitleString:DOLocalizedString(@"AAAA") withAlpha:0.6],
+        [DOGlobalAppearance secondarySubtitleString:DOLocalizedString(@"AAAB") withAlpha:0.6],
+        [DOGlobalAppearance secondarySubtitleString:@" " withAlpha:0.8]
     ]];
     
     [stackView addArrangedSubview:headerView];
