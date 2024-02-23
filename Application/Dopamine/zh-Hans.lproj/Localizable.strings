@@ -121,4 +121,4 @@
 "Button_Mount" = "确定";
 
 "System_Uptime_Format" = "已运行: %d天 %d时 %d分 %d秒";
-
+"Settings_Disable_Update" = "禁用更新检测";

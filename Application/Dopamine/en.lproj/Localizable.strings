@@ -122,3 +122,4 @@
 "Button_Mount" = "Set";
 
 "System_Uptime_Format" = "uptime: %ddays %dh %dm %ds";
+"Settings_Disable_Update" = "Disable Update";

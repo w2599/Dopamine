@@ -210,9 +210,9 @@
                 }
             }
             
-            PSSpecifier *settingsGroupSpecifier = [PSSpecifier emptyGroupSpecifier];
-            settingsGroupSpecifier.name = DOLocalizedString(@"Section_Jailbreak_Settings");
-            [specifiers addObject:settingsGroupSpecifier];
+            // PSSpecifier *settingsGroupSpecifier = [PSSpecifier emptyGroupSpecifier];
+            // settingsGroupSpecifier.name = DOLocalizedString(@"Section_Jailbreak_Settings");
+            // [specifiers addObject:settingsGroupSpecifier];
             
             PSSpecifier *tweakInjectionSpecifier = [PSSpecifier preferenceSpecifierNamed:DOLocalizedString(@"Settings_Tweak_Injection") target:self set:@selector(setTweakInjectionEnabled:specifier:) get:@selector(readTweakInjectionEnabled:) detail:nil cell:PSSwitchCell edit:nil];
             [tweakInjectionSpecifier setProperty:@YES forKey:@"enabled"];
@@ -228,18 +228,24 @@
                 [specifiers addObject:verboseLogSpecifier];
             }
             
-            PSSpecifier *idownloadSpecifier = [PSSpecifier preferenceSpecifierNamed:DOLocalizedString(@"Settings_iDownload") target:self set:@selector(setIDownloadEnabled:specifier:) get:@selector(readIDownloadEnabled:) detail:nil cell:PSSwitchCell edit:nil];
-            [idownloadSpecifier setProperty:@YES forKey:@"enabled"];
-            [idownloadSpecifier setProperty:@"idownloadEnabled" forKey:@"key"];
-            [idownloadSpecifier setProperty:@NO forKey:@"default"];
-            [specifiers addObject:idownloadSpecifier];
+            // PSSpecifier *idownloadSpecifier = [PSSpecifier preferenceSpecifierNamed:DOLocalizedString(@"Settings_iDownload") target:self set:@selector(setIDownloadEnabled:specifier:) get:@selector(readIDownloadEnabled:) detail:nil cell:PSSwitchCell edit:nil];
+            // [idownloadSpecifier setProperty:@YES forKey:@"enabled"];
+            // [idownloadSpecifier setProperty:@"idownloadEnabled" forKey:@"key"];
+            // [idownloadSpecifier setProperty:@NO forKey:@"default"];
+            // [specifiers addObject:idownloadSpecifier];
             
             PSSpecifier *appJitSpecifier = [PSSpecifier preferenceSpecifierNamed:DOLocalizedString(@"Settings_Apps_JIT") target:self set:@selector(setAppJITEnabled:specifier:) get:@selector(readAppJITEnabled:) detail:nil cell:PSSwitchCell edit:nil];
             [appJitSpecifier setProperty:@YES forKey:@"enabled"];
             [appJitSpecifier setProperty:@"appJITEnabled" forKey:@"key"];
             [appJitSpecifier setProperty:@YES forKey:@"default"];
             [specifiers addObject:appJitSpecifier];
-            
+
+            PSSpecifier *disableUpdateSpecifier = [PSSpecifier preferenceSpecifierNamed:DOLocalizedString(@"Settings_Disable_Update") target:self set:defSetter get:defGetter detail:nil cell:PSSwitchCell edit:nil];
+            [disableUpdateSpecifier setProperty:@YES forKey:@"enabled"];
+            [disableUpdateSpecifier setProperty:@"disableUpdateEnabled" forKey:@"key"];
+            [disableUpdateSpecifier setProperty:@NO forKey:@"default"];
+            [specifiers addObject:disableUpdateSpecifier];
+
             PSSpecifier *jetsamSpecifier = [PSSpecifier preferenceSpecifierNamed:DOLocalizedString(@"Settings_Jetsam_Multiplier") target:self set:@selector(setJetsamMultiplier:specifier:) get:@selector(readJetsamMultiplier:) detail:nil cell:PSLinkListCell edit:nil];
             [jetsamSpecifier setProperty:@YES forKey:@"enabled"];
             [jetsamSpecifier setProperty:@"jetsamMultiplier" forKey:@"key"];
@@ -257,9 +263,9 @@
             }
             
             if (envManager.isJailbroken || (envManager.isInstalledThroughTrollStore && envManager.isBootstrapped)) {
-                PSSpecifier *actionsGroupSpecifier = [PSSpecifier emptyGroupSpecifier];
-                actionsGroupSpecifier.name = DOLocalizedString(@"Section_Actions");
-                [specifiers addObject:actionsGroupSpecifier];
+                // PSSpecifier *actionsGroupSpecifier = [PSSpecifier emptyGroupSpecifier];
+                // actionsGroupSpecifier.name = DOLocalizedString(@"Section_Actions");
+                // [specifiers addObject:actionsGroupSpecifier];
                 
                 if (envManager.isJailbroken) {
                     PSSpecifier *refreshAppsSpecifier = [PSSpecifier emptyGroupSpecifier];
@@ -326,9 +332,9 @@
             }
         }
         
-        PSSpecifier *themingGroupSpecifier = [PSSpecifier emptyGroupSpecifier];
-        themingGroupSpecifier.name = DOLocalizedString(@"Section_Customization");
-        [specifiers addObject:themingGroupSpecifier];
+        // PSSpecifier *themingGroupSpecifier = [PSSpecifier emptyGroupSpecifier];
+        // themingGroupSpecifier.name = DOLocalizedString(@"Section_Customization");
+        // [specifiers addObject:themingGroupSpecifier];
         
         PSSpecifier *themeSpecifier = [PSSpecifier preferenceSpecifierNamed:DOLocalizedString(@"Theme") target:self set:defSetter get:defGetter detail:nil cell:PSLinkListCell edit:nil];
         themeSpecifier.detailControllerClass = [DOPSListItemsController class];
@@ -357,13 +363,13 @@
             [specifiers addObject:unmountSpecifier];
         }
 
-						PSSpecifier *rebootSpecifier = [PSSpecifier emptyGroupSpecifier];
-            rebootSpecifier.target = self;
-            [rebootSpecifier setProperty:@"Button_Reboot" forKey:@"title"];
-            [rebootSpecifier setProperty:@"DOButtonCell" forKey:@"headerCellClass"];
-            [rebootSpecifier setProperty:@"arrow.triangle.2.circlepath" forKey:@"image"];
-            [rebootSpecifier setProperty:@"rebootPressed" forKey:@"action"];
-            [specifiers addObject:rebootSpecifier];
+	    PSSpecifier *rebootSpecifier = [PSSpecifier emptyGroupSpecifier];
+	    rebootSpecifier.target = self;
+	    [rebootSpecifier setProperty:@"Button_Reboot" forKey:@"title"];
+	    [rebootSpecifier setProperty:@"DOButtonCell" forKey:@"headerCellClass"];
+	    [rebootSpecifier setProperty:@"arrow.triangle.2.circlepath" forKey:@"image"];
+	    [rebootSpecifier setProperty:@"rebootPressed" forKey:@"action"];
+	    [specifiers addObject:rebootSpecifier];
         
 
         _specifiers = specifiers;
