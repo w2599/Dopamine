@@ -117,8 +117,12 @@
 
 // mount 
 "Input_Mmount_Title" = "新增挂载";
-"Input_Mount_Title_B" = "输入原始路径";
-"Input_Mount_Path" = "输入原始路径";
+"Input_Unmount_Title" = "管理挂载";
+"Input_Mount_Title" = "输入原始路径";
+"Select_Mount_Title" = "选择需要操作的路径";
+"Button_Delete_Path_Only" = "仅删除路径";
+"Button_Delete" = "取消挂载";
+"Button_View" = "Filza查看";
 "Button_Mount" = "确定";
 
 "Input_Unmount_Title" = "取消挂载";
