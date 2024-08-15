@@ -116,8 +116,12 @@
 
 // mount 
 "Input_Mmount_Title" = "新增挂载";
-"Input_Unmount_Title" = "取消挂载";
+"Input_Unmount_Title" = "管理挂载";
 "Input_Mount_Title" = "输入原始路径";
+"Select_Mount_Title" = "选择需要操作的路径";
+"Button_Delete_Path_Only" = "仅删除路径";
+"Button_Delete" = "取消挂载";
+"Button_View" = "Filza查看";
 "Button_Mount" = "确定";
 
 "System_Uptime_Format" = "已运行: %d天 %d时 %d分 %d秒";
