@@ -1,0 +1,136 @@
+name: build_Release
+
+on:
+  workflow_dispatch:
+
+env:
+  VERSION: '2.0.11'
+  BUNDLEID: 'com.zqbb.Dopamine-roothide'
+
+jobs:
+  build:
+    runs-on: macos-13
+    steps:
+      - name: Checkout
+        uses: actions/checkout@main
+        with:
+            submodules: recursive
+
+      - name: Pre Procursus
+        uses: w2599/procursus-action@main
+        with:
+          packages: ldid findutils coreutils make sed
+
+      - name: Pre trustcache
+        run: |
+          set -x
+          git clone https://github.com/CRKatri/trustcache
+          cd trustcache
+          gmake -j$(sysctl -n hw.physicalcpu) OPENSSL=1
+          sudo cp trustcache /opt/procursus/bin/
+
+      - name: Pre theos
+        run: |
+          set -x
+          export BASEDIR="$(pwd)"
+          export THEOS="${BASEDIR}/theos"
+          mkdir -p $THEOS
+          curl -fsSL https://raw.githubusercontent.com/roothide/theos/master/bin/install-theos >> install-theos.sh
+          gsed -E "/^\s*get_theos\s*$/,+1 s/^(\s*)(get_sdks)\s*$/\1mkdir -p \${THEOS}\/sdks\n\1touch \${THEOS}\/sdks\/sdk\n\1\2/g" -i install-theos.sh
+          bash install-theos.sh
+          curl -L https://github.com/theos/sdks/releases/latest/download/iPhoneOS16.5.sdk.tar.xz --output $THEOS/sdks/iPhoneOS16.5.sdk.tar.xz
+          gunzip $THEOS/sdks/iPhoneOS16.5.sdk.tar.xz
+          tar -xf $THEOS/sdks/iPhoneOS16.5.sdk.tar -C $THEOS/sdks
+          rm $THEOS/sdks/iPhoneOS16.5.sdk.tar
+          cd $BASEDIR
+
+      - name: Pre Bundleid
+        run: |
+          sed -i '' "s/com.opa334.Dopamine-roothide/${{ env.BUNDLEID }}/g" ./Application/Dopamine/Jailbreak/DOPreferenceManager.m
+          sed -i '' "s/com.opa334.Dopamine-roothide/${{ env.BUNDLEID }}/g" ./Application/Dopamine.xcodeproj/project.pbxproj
+          sed -i '' "s/com.opa334.Dopamine-roothide/${{ env.BUNDLEID }}/g" ./BaseBin/jbctl/src/main.m
+
+      - name: Pre Version
+        run: |
+          set -x
+          orig_version=$(cat ./BaseBin/_external/basebin/.version)
+          if [[ "${{ env.VERSION }}" > "$orig_version" ]]; then
+            echo "${{ env.VERSION }}" >./BaseBin/_external/basebin/.version
+            sed -i '' 's/MARKETING_VERSION = .*;/MARKETING_VERSION = ${{ env.VERSION }};/g' ./Application/Dopamine.xcodeproj/project.pbxproj
+          fi
+          echo "newVERSION=$(cat ./BaseBin/_external/basebin/.version)" >> $GITHUB_ENV
+
+      - name: Pre env
+        run: |
+         sT=$(TZ=UTC-8 date +'%S')
+         echo "msT=$(TZ=UTC-8 date -j -f "%Y-%m-%d %H:%M:%S" "$(TZ=UTC-8 date +'%Y-%m-%d %H:%M'):${sT}" +%s)" >> $GITHUB_ENV
+         echo "shT=$(TZ=UTC-8 date +'%Y.%m.%d/%H.%M').${sT}" >> $GITHUB_ENV
+         echo "logT=$(TZ=UTC-8 date +'%Y年%m月%d %H:%M'):${sT}" >> $GITHUB_ENV
+         echo "SHASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Log env
+        run: |
+         echo ${{ env.newVERSION }}
+         echo ${{ env.msT }}
+         echo ${{ env.shT }}
+         echo ${{ env.logT }}
+         echo ${{ env.SHASH }}
+
+      - name: Pre code
+        run: |
+          sed -i '' "s/AAAA/v${{ env.newVERSION }}.${{ env.msT }}/g" ./Application/Dopamine/UI/DOMainViewController.m
+          sed -i '' "s/AAAB/不要为了升级而放弃越狱的乐趣~/g" ./Application/Dopamine/UI/DOMainViewController.m
+          sed -i '' "s/AAAB/不要为了升级而放弃越狱的乐趣~/g" ./Application/Dopamine/UI/DOMainViewController.m
+          # sed -i '' "s/opa334/w2599/g" ./Application/Dopamine/UI/Settings/DOCreditsViewController.m
+          # sed -i '' "s/opa334/w2599/g" ./Application/Dopamine/UI/Update/DOUpdateViewController.m
+          # sed -i '' "s/opa334/w2599/g" ./Application/Dopamine/UI/DOUIManager.m
+          
+      # - name: Pre body
+      #   run: |
+      #     echo -e "版本：${{ env.newVERSION }}\n编译时间戳：${{ env.msT }}\n北京时间：${{ env.shT }}" >> body.txt
+      #     echo -e "\n增删改：" >> body.txt
+      #     echo -e "${{ env.logT }}" >> body.txt
+      #     echo -e "> - .1默认主题为修仙.不喜可在设置修改主题~" >> body.txt
+      #     echo -e "> - .2设置界面新增挂载按钮.在最底下~~" >> body.txt
+      #     echo -e "> - . 越狱时自动挂载/var/mobile/newFakePath_RH.plist里面的目录" >> body.txt
+      #     echo -e "> - .3修复更新越狱工具相关代码" >> body.txt
+      #     echo -e "> - .4添加开机时间显示" >> body.txt
+      #     echo -e "> - .5添加禁止更新检测" >> body.txt
+          
+      - name: Pre xcode-select
+        run: |
+          # sudo xcode-select --switch /Applications/Xcode_15.0.app
+
+      # - name: Pre Bootstraps
+      #   run: |
+      #     set -x
+      #     cd Application/Dopamine/Resources
+      #     ./download_bootstraps.sh
+
+      - name: Build tipa
+        run: |
+          set -x
+          export BASEDIR="$(pwd)"
+          export THEOS="${BASEDIR}/theos"
+          gmake -j$(sysctl -n hw.physicalcpu) NIGHTLY=1
+          # cp Dopamine/Dopamine.tipa Dopamine.tipa
+          mv Application/Dopamine.tipa Dopamine_roothide_blacklist_${{ env.newVERSION }}_${{ env.msT }}_${{ env.SHASH }}.tipa
+
+      # - name: Release
+      #   uses: softprops/action-gh-release@v1
+      #   with:
+      #     name: ${{ env.newVERSION }}
+      #     tag_name: ${{ env.newVERSION }}
+      #     body_path: body.txt
+      #     prerelease: false
+      #     token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
+      #     files: |
+      #      *.tipa
+
+      - name: Upload Latest Artifact
+        id: dopamine-latest-upload
+        uses: actions/upload-artifact@main
+        with:
+          name: Dopamine_Latest
+          path: |
+            *.tipa
