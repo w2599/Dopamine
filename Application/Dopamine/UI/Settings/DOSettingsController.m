@@ -127,7 +127,9 @@
 {
     return @[
     @2,
+    @2.5,
     @3,
+    @3.5,
     @4,
     @5,
     @6,
@@ -139,13 +141,15 @@
 - (NSArray *)jetsamOptionTitles
 {
     return @[
-        @"1x",
-        @"1.5x",
-        @"2x",
-        @"2.5x",
-        [NSString stringWithFormat:@"3x (%@)", DOLocalizedString(@"Recommended")],
-        @"3.5x",
-        @"4x",
+        @"1.00x",
+        @"1.25x",
+        @"1.50x",
+        @"1.75x",
+        @"2.00x",
+        @"2.50x",
+        [NSString stringWithFormat:@"3.00x (%@)", DOLocalizedString(@"Recommended")],
+        @"3.50x",
+        @"4.00x",
     ];
 }
 
@@ -523,7 +527,7 @@
     DOEnvironmentManager *envManager = [DOEnvironmentManager sharedManager];
     if (envManager.isJailbroken) {
         double v = jbclient_jbsettings_get_double("jetsamMultiplier");
-        return @((v < 1 || isnan(v)) ? 6 : ceil(v * 2));
+        return @((v < 1 || isnan(v)) ? 6 : (v * 2));
     }
     return [self readPreferenceValue:specifier];
 }
