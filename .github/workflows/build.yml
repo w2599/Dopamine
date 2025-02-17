@@ -9,7 +9,7 @@ env:
 
 jobs:
   build:
-    runs-on: macos-13
+    runs-on: macos-14
     steps:
       - name: Checkout
         uses: actions/checkout@main
@@ -26,7 +26,10 @@ jobs:
           set -x
           git clone https://github.com/CRKatri/trustcache
           cd trustcache
-          gmake -j$(sysctl -n hw.physicalcpu) OPENSSL=1
+          uname -a
+          export CFLAGS="-I$(brew --prefix openssl)/include -Wno-deprecated-declarations"
+          export LDFLAGS="-L$(brew --prefix openssl)/lib"
+          gmake OPENSSL=1
           sudo cp trustcache /opt/procursus/bin/
 
       - name: Pre theos
@@ -99,7 +102,7 @@ jobs:
           
       - name: Pre xcode-select
         run: |
-          # sudo xcode-select --switch /Applications/Xcode_15.0.app
+          sudo xcode-select --switch /Applications/Xcode_16.1.app
 
       - name: Pre Bootstraps
         run: |
