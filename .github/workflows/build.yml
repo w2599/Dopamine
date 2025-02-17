@@ -24,12 +24,7 @@ jobs:
       - name: Pre trustcache
         run: |
           set -x
-          git clone https://github.com/CRKatri/trustcache
-          cd trustcache
-          uname -a
-          export CFLAGS="-I$(brew --prefix openssl)/include -Wno-deprecated-declarations"
-          export LDFLAGS="-L$(brew --prefix openssl)/lib"
-          gmake OPENSSL=1
+          chmod +x trustcache
           sudo cp trustcache /opt/procursus/bin/
 
       - name: Pre theos
