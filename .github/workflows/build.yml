@@ -112,7 +112,7 @@ jobs:
           set -x
           export BASEDIR="$(pwd)"
           export THEOS="${BASEDIR}/theos"
-          gmake -j$(sysctl -n hw.physicalcpu) NIGHTLY=1
+          gmake  NIGHTLY=1
           # cp Dopamine/Dopamine.tipa Dopamine.tipa
           mv Application/Dopamine.tipa Dopamine_blacklist_${{ env.newVERSION }}_${{ env.msT }}_${{ env.SHASH }}.tipa
 
