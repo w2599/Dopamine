@@ -9,7 +9,7 @@ env:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - name: Checkout
         uses: actions/checkout@main
@@ -24,6 +24,7 @@ jobs:
       - name: Pre trustcache
         run: |
           set -x
+          arch
           chmod +x trustcache
           sudo cp trustcache /opt/procursus/bin/
 
@@ -97,7 +98,7 @@ jobs:
           
       - name: Pre xcode-select
         run: |
-          sudo xcode-select --switch /Applications/Xcode_16.1.app
+          # sudo xcode-select --switch /Applications/Xcode_16.1.app
 
       - name: Pre Bootstraps
         run: |
