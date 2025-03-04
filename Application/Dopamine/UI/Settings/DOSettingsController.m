@@ -377,6 +377,10 @@
             [unmountSpecifier setProperty:@"trash" forKey:@"image"];
             [unmountSpecifier setProperty:@"unmountPressed" forKey:@"action"];
             [specifiers addObject:unmountSpecifier];
+
+            // 空白行
+            PSSpecifier *blankSpecifier = [PSSpecifier emptyGroupSpecifier];
+            [specifiers addObject:blankSpecifier];
         }
 
 			PSSpecifier *rebootSpecifier = [PSSpecifier emptyGroupSpecifier];
