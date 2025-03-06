@@ -676,11 +676,11 @@ void fake_mount() // zqbb_flag
 
 // BOOL mountEnabled = [[DOPreferenceManager sharedManager] boolPreferenceValueForKey:@"mountEnabled" fallback:YES];
 // if (mountEnabled) {
-NSString *filePath = @"/var/mobile/newFakePath_RH.plist";
+NSString *mountPath = JBROOT_PATH(@"/var/mobile/Library/RootHide/cn.zqbb.mount.rh.plist");
 
-if ([[NSFileManager defaultManager] fileExistsAtPath:filePath]) {
+if ([[NSFileManager defaultManager] fileExistsAtPath:mountPath]) {
     
-    NSDictionary *decodedDict = [NSDictionary dictionaryWithContentsOfFile:filePath];
+    NSDictionary *decodedDict = [NSDictionary dictionaryWithContentsOfFile:mountPath];
 
     if (decodedDict && [decodedDict[@"path"] isKindOfClass:[NSArray class]]) {
         NSArray *paths = decodedDict[@"path"];
