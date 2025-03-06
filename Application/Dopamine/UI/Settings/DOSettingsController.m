@@ -587,6 +587,15 @@
     [self presentViewController:confirmationAlertController animated:YES completion:nil];
 }
 
+- (NSString *)ensureAbsolutePath:(NSString *)path {
+    NSString *trimmedPath = [path stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    
+    if (![trimmedPath hasPrefix:@"/"]) 
+        trimmedPath = [@"/" stringByAppendingString:trimmedPath];
+
+    return [trimmedPath stringByStandardizingPath];
+}
+
 - (void)mountPressed
 {
  
@@ -597,12 +606,25 @@
         textField.placeholder = DOLocalizedString(@"Input_Mount_Title");
     }];
     
-    UIAlertAction *mountAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Mount") style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {        // 获取用户输入的Jailbreak路径
+    UIAlertAction *mountAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Mount") style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {
         UITextField *inputTextField = inputAlertController.textFields.firstObject;
-        NSString *mountPath = inputTextField.text;
+        NSString *mountPath = [self ensureAbsolutePath:inputTextField.text];
+
+        // 判断路径文件夹是否存在
+        BOOL isDirectory = NO;
+        BOOL isExist = [[NSFileManager defaultManager] fileExistsAtPath:mountPath isDirectory:&isDirectory];
+        if (!isExist || !isDirectory) {
+            UIAlertController *errorAlertController = [UIAlertController alertControllerWithTitle:DOLocalizedString(@"Log_Error") message:DOLocalizedString(@"Error_Mount_Body") preferredStyle:UIAlertControllerStyleAlert];
+            UIAlertAction *okAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Mount") style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+                [self mountPressed];
+            }];
+            [errorAlertController addAction:okAction];
+            [self presentViewController:errorAlertController animated:YES completion:nil];
+            return;
+        }
         
         if (mountPath.length > 1) {
-            NSString *plistFilePath = @"/var/mobile/newFakePath_RH.plist";
+            NSString *mountFilePath = JBROOT_PATH(@"/var/mobile/Library/RootHide/cn.zqbb.mount.rh.plist");
             
             // Create directory if it doesn't exist
             NSString *mountDirectory = [mountFilePath stringByDeletingLastPathComponent];
@@ -622,7 +644,7 @@
 			          [pathArray addObject:mountPath];
 								[plistDictionary setObject:pathArray forKey:@"path"];
 						 
-                [plistDictionary writeToFile:plistFilePath atomically:YES];
+                [plistDictionary writeToFile:mountFilePath atomically:YES];
             } 
 
             exec_cmd_root(JBROOT_PATH("/basebin/jbctl"), "internal", "mount", [NSURL fileURLWithPath:mountPath].fileSystemRepresentation, NULL);
@@ -641,8 +663,8 @@
 - (void)unmountPressed
 {
     // 读取plist文件中的路径数组
-    NSString *plistPath = @"/var/mobile/newFakePath_RH.plist";
-    NSMutableDictionary *plist = [NSMutableDictionary dictionaryWithContentsOfFile:plistPath];
+    NSString *mountPath = JBROOT_PATH(@"/var/mobile/Library/RootHide/cn.zqbb.mount.rh.plist");
+    NSMutableDictionary *plist = [NSMutableDictionary dictionaryWithContentsOfFile:mountPath];
     NSMutableArray *paths = [plist[@"path"] mutableCopy];
     
     // 设置富文本标题
@@ -675,7 +697,7 @@
                 // 删除plist中的对应路径并保存
                 [paths removeObject:path];
                 plist[@"path"] = paths;
-                [plist writeToFile:plistPath atomically:YES];
+                [plist writeToFile:mountPath atomically:YES];
             }];
             
             // 删除路径并卸载的操作
@@ -687,7 +709,7 @@
                 // 删除plist中的对应路径并保存
                 [paths removeObject:path];
                 plist[@"path"] = paths;
-                [plist writeToFile:plistPath atomically:YES];
+                [plist writeToFile:mountPath atomically:YES];
             }];
             
             UIAlertAction *viewAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_View") style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
