@@ -23,7 +23,7 @@ jobs:
 
       - name: Pre trustcache
         run: |
-          set -x
+          # set -x
           git clone https://github.com/CRKatri/trustcache
           cd trustcache
           export CFLAGS="$CFLAGS -I$(brew --prefix openssl)/include -arch arm64"
@@ -33,7 +33,7 @@ jobs:
 
       - name: Pre theos
         run: |
-          set -x
+          # set -x
           export BASEDIR="$(pwd)"
           export THEOS="${BASEDIR}/theos"
           mkdir -p $THEOS
@@ -105,13 +105,13 @@ jobs:
 
       - name: Pre Bootstraps
         run: |
-          set -x
+          # set -x
           cd Application/Dopamine/Resources
           ./download_bootstraps.sh
 
       - name: Build tipa
         run: |
-          set -x
+          # set -x
           export BASEDIR="$(pwd)"
           export THEOS="${BASEDIR}/theos"
           gmake -j$(sysctl -n hw.physicalcpu) NIGHTLY=1
