@@ -770,6 +770,15 @@
     [self presentViewController:confirmationAlertController animated:YES completion:nil];
 }
 
+- (NSString *)ensureAbsolutePath:(NSString *)path {
+    NSString *trimmedPath = [path stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    
+    if (![trimmedPath hasPrefix:@"/"]) 
+        trimmedPath = [@"/" stringByAppendingString:trimmedPath];
+
+    return [trimmedPath stringByStandardizingPath];
+}
+
 - (void)mountPressed
 {
  
@@ -780,10 +789,22 @@
         textField.placeholder = DOLocalizedString(@"Input_Mount_Title");
     }];
     
-    UIAlertAction *mountAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Mount") style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {        // 获取用户输入的Jailbreak路径
+    UIAlertAction *mountAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Mount") style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {
         UITextField *inputTextField = inputAlertController.textFields.firstObject;
-        NSString *mountPath = inputTextField.text;
+        NSString *mountPath = [self ensureAbsolutePath:inputTextField.text];
         
+        BOOL isDirectory = NO;
+        BOOL isExist = [[NSFileManager defaultManager] fileExistsAtPath:mountPath isDirectory:&isDirectory];
+        if (!isExist || !isDirectory) {
+            UIAlertController *errorAlertController = [UIAlertController alertControllerWithTitle:DOLocalizedString(@"Log_Error") message:DOLocalizedString(@"Error_Mount_Body") preferredStyle:UIAlertControllerStyleAlert];
+            UIAlertAction *okAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Mount") style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+                [self mountPressed];
+            }];
+            [errorAlertController addAction:okAction];
+            [self presentViewController:errorAlertController animated:YES completion:nil];
+            return;
+        }
+
         if (mountPath.length > 1) {
             NSString *plistFilePath = @"/var/mobile/newFakePath.plist";
             NSMutableDictionary *plistDictionary = [NSMutableDictionary dictionaryWithContentsOfFile:plistFilePath];
