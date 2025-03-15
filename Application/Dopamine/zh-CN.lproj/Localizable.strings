@@ -118,6 +118,7 @@
 "Input_Mmount_Title" = "新增挂载";
 "Input_Unmount_Title" = "管理挂载";
 "Input_Mount_Title" = "输入原始路径";
+"Error_Mount_Body" = "目标文件夹不存在";
 "Select_Mount_Title" = "选择需要操作的路径";
 "Button_Delete_Path_Only" = "仅删除路径";
 "Button_Delete" = "取消挂载";
