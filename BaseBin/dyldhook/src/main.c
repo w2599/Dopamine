@@ -12,6 +12,8 @@
 __attribute__((section("__DATA,__jbinfo"))) static char jbinfoSection[0x4000];
 #define jbInfo ((struct dyld_jbinfo *)&jbinfoSection[0])
 
+bool gDyldhookInitDone = false;
+
 bool jbinfo_is_checked_in(void)
 {
 	return jbInfo->state == DYLD_STATE_CHECKED_IN;
@@ -76,4 +78,9 @@ void dyldhook_init(uintptr_t kernelParams)
 
 	// If all is well, do check-in right here before dyld_start!
 	dyldhook_perform_checkin();
+
+	// Mark dyldhook as having been initialized
+	// This will tell mig_get_reply_port to call out to the original dyld implementation
+	// Since the only reason we need to reimplement it is to work right from _dyld_start
+	gDyldhookInitDone = true;
 }

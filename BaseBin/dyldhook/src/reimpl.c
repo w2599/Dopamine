@@ -44,17 +44,25 @@ int64_t sandbox_extension_consume(const char *extension_token)
 
 // mig_get_reply_port has to be reimplemented because the implementation inside dyld accesses TPIDRRO_EL0 (which is NULL when the dyldhook code runs)
 // We make the reimplementation store it in a global instead, which is enough since we will only be calling it from one thread anyways
+// gMigReplyPort will be invalid after the process forks, so we need to make sure to only use that during the process initialization
+// That's why after gDyldhookInitDone is true, we will simply use dyld's mig_get_reply_port again, since TPIDRRO_EL0 should be initialized the next time it's called
 mach_port_t gMigReplyPort = 0;
+extern bool gDyldhookInitDone;
+mach_port_t dyld_mig_get_reply_port(void);
 
 #if IOS == 15
 extern mach_port_t mach_reply_port(void);
 
 mach_port_t mig_get_reply_port(void) {
-    if (!gMigReplyPort) {
-        gMigReplyPort = mach_reply_port();
-    }
+	if (!gDyldhookInitDone) {
+		if (!gMigReplyPort) {
+			gMigReplyPort = mach_reply_port();
+		}
+	
+		return gMigReplyPort;
+	}
 
-    return gMigReplyPort;
+	return dyld_mig_get_reply_port();
 }
 #else // iOS 16+
 
@@ -63,11 +71,15 @@ struct mach_port_options gMigOptions = {
 };
 
 mach_port_t mig_get_reply_port(void) {
-    if (!gMigReplyPort) {
-		struct mach_port_options options = gMigOptions;
-        mach_port_construct(task_self_trap(), &options, 0, &gMigReplyPort);
-    }
-    return gMigReplyPort;
+	if (!gDyldhookInitDone) {
+		if (!gMigReplyPort) {
+			struct mach_port_options options = gMigOptions;
+			mach_port_construct(task_self_trap(), &options, 0, &gMigReplyPort);
+		}
+		return gMigReplyPort;
+	}
+
+	return dyld_mig_get_reply_port();
 }
 
 // iOS 16+ dyld's do no longer have mach_msg, reimplement it
