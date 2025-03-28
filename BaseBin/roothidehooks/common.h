@@ -15,4 +15,9 @@ bool isJailbreakBundlePath(const char* path);
     @"com.opa334.Dopamine", \
     @"com.opa334.Dopamine.roothide", \
     @"com.opa334.Dopamine-roothide", \
+    @"com.zqbb.Dopamine", \
+    @"com.zqbb.Dopamine.roothide", \
+    @"com.zqbb.Dopamine-roothide", \
+    @"wiki.qaq.TrollFools", \
+    @"com.netskao.dumpdecrypter", \
 ]
