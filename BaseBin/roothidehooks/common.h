@@ -25,4 +25,19 @@ int csops(pid_t pid, unsigned int  ops, void * useraddr, size_t usersize);
     @"com.opa334.Dopamine", \
     @"com.opa334.Dopamine.roothide", \
     @"com.opa334.Dopamine-roothide", \
+    @"com.opa334.TrollStore", \
+    @"com.zqbb.Dopamine", \
+    @"com.zqbb.Dopamine.roothide", \
+    @"com.zqbb.Dopamine-roothide", \
+    @"com.zqbb.TrollStore", \
+    @"wiki.qaq.TrollFools", \
+    @"com.netskao.dumpdecrypter", \
+    @"org.coolstar.SileoStore", \
+    @"com.roothide.manager", \
+    @"com.roothide.patcher", \
+    @"com.tigisoftware.Filza", \
+    @"com.amywhile.Aemulo", \
+    @"com.82flex.reveil", \
+    @"com.yiming.iMemScan", \
+    @"com.apibug.CheatEngine", \
 ]
