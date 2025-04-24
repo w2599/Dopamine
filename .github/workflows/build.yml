@@ -62,28 +62,30 @@ jobs:
 
       - name: Pre env
         run: |
-         sT=$(TZ=UTC-8 date +'%S')
-         echo "msT=$(TZ=UTC-8 date -j -f "%Y-%m-%d %H:%M:%S" "$(TZ=UTC-8 date +'%Y-%m-%d %H:%M'):${sT}" +%s)" >> $GITHUB_ENV
-         echo "shT=$(TZ=UTC-8 date +'%Y.%m.%d/%H.%M').${sT}" >> $GITHUB_ENV
-         echo "logT=$(TZ=UTC-8 date +'%Y年%m月%d %H:%M'):${sT}" >> $GITHUB_ENV
-         echo "SHASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+          sT=$(TZ=UTC-8 date +'%S')
+          echo "msT=$(TZ=UTC-8 date -j -f "%Y-%m-%d %H:%M:%S" "$(TZ=UTC-8 date +'%Y-%m-%d %H:%M'):${sT}" +%s)" >> $GITHUB_ENV
+          echo "shT=$(TZ=UTC-8 date +'%Y.%m.%d/%H.%M').${sT}" >> $GITHUB_ENV
+          echo "logT=$(TZ=UTC-8 date +'%Y年%m月%d %H:%M'):${sT}" >> $GITHUB_ENV
+          echo "SHASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+          echo "commitCount=$(curl -s "https://api.github.com/repos/roothide/Dopamine2-roothide/commits?per_page=1" -I | grep -i 'link' | sed -n 's/.*page=\([0-9]*\)>; rel="last".*/\1/p')" >> $GITHUB_ENV
 
       - name: Log env
         run: |
-         echo ${{ env.newVERSION }}
-         echo ${{ env.msT }}
-         echo ${{ env.shT }}
-         echo ${{ env.logT }}
-         echo ${{ env.SHASH }}
+          echo ${{ env.newVERSION }}
+          echo ${{ env.msT }}
+          echo ${{ env.shT }}
+          echo ${{ env.logT }}
+          echo ${{ env.SHASH }}
+          echo ${{ env.commitCount }}
 
       - name: Pre code
         run: |
-          sed -i '' "s/AAAA/v${{ env.newVERSION }}.${{ env.msT }}/g" ./Application/Dopamine/UI/DOMainViewController.m
+          sed -i '' "s/AAAA/v${{ env.newVERSION }}  ${{ env.commitCount }}  ${{ env.msT }}/g" ./Application/Dopamine/UI/DOMainViewController.m
           sed -i '' "s/AAAB/不要为了升级而放弃越狱的乐趣~/g" ./Application/Dopamine/UI/DOMainViewController.m
           sed -i '' "s/AAAB/不要为了升级而放弃越狱的乐趣~/g" ./Application/Dopamine/UI/DOMainViewController.m
-          # sed -i '' "s/opa334/w2599/g" ./Application/Dopamine/UI/Settings/DOCreditsViewController.m
-          # sed -i '' "s/opa334/w2599/g" ./Application/Dopamine/UI/Update/DOUpdateViewController.m
-          # sed -i '' "s/opa334/w2599/g" ./Application/Dopamine/UI/DOUIManager.m
+          sed -i '' "s/roothide\/Dopamine2-roothide/w2599\/Dopamine\/tree\/rh2.x_modify/g" ./Application/Dopamine/UI/Settings/DOCreditsViewController.m
+          sed -i '' "s/roothide\/Dopamine2-roothide/w2599\/Dopamine/g" ./Application/Dopamine/UI/Update/DOUpdateViewController.m
+          sed -i '' "s/roothide\/Dopamine2-roothide/w2599\/Dopamine/g" ./Application/Dopamine/UI/DOUIManager.m
           
       # - name: Pre body
       #   run: |
@@ -114,7 +116,7 @@ jobs:
           export THEOS="${BASEDIR}/theos"
           gmake -j$(sysctl -n hw.physicalcpu) NIGHTLY=1
           # cp Dopamine/Dopamine.tipa Dopamine.tipa
-          mv Application/Dopamine.tipa Dopamine_roothide_blacklist_${{ env.newVERSION }}_${{ env.msT }}_${{ env.SHASH }}.tipa
+          mv Application/Dopamine.tipa Dopamine_roothide_blacklist_${{ env.newVERSION }}_${{ env.commitCount }}_${{ env.msT }}_${{ env.SHASH }}.tipa
 
       # - name: Release
       #   uses: softprops/action-gh-release@v1
