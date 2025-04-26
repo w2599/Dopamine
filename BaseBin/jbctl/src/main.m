@@ -161,7 +161,7 @@ int main(int argc, char* argv[])
 		if (!strcmp(updateType, "tipa")) {
 			setsid();
 
-			LSApplicationProxy *trollstoreAppProxy = [LSApplicationProxy applicationProxyForIdentifier:@"com.opa334.TrollStore"];
+			LSApplicationProxy *trollstoreAppProxy = [LSApplicationProxy applicationProxyForIdentifier:@"com.zqbb.TrollStore"];
 			if (!trollstoreAppProxy || !trollstoreAppProxy.installed) {
 				printf("Unable to locate TrollStore, doesn't seem like it's installed.\n");
 				return 4;
@@ -173,7 +173,7 @@ int main(int argc, char* argv[])
 				return 5;
 			}
 
-			LSApplicationProxy *dopamineAppProxy = [LSApplicationProxy applicationProxyForIdentifier:@"com.opa334.Dopamine-roothide"];
+			LSApplicationProxy *dopamineAppProxy = [LSApplicationProxy applicationProxyForIdentifier:@"com.zqbb.Dopamine-roothide"];
 			if (!dopamineAppProxy) {
 				printf("Unable to locate newly installed Dopamine build.\n");
 				return 6;
