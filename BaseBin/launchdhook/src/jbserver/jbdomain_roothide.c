@@ -31,7 +31,7 @@ static int trust_macho_recurse(const char *machoPath, const char *dlopenCallerIm
 	// But you know, never trust the client :D
 	extern bool can_skip_trusting_file(const char *machoPath, bool isLibrary, bool isClient);
 
-	if (can_skip_trusting_file(machoPath, dlopenCallerExecutablePath==NULL, false)) return -1;
+	if (can_skip_trusting_file(machoPath, (dlopenCallerExecutablePath != NULL), false)) return -1;
 
 	size_t preferredArchCount = 0;
 	if (preferredArchsArray) preferredArchCount = xpc_array_get_count(preferredArchsArray);
@@ -196,15 +196,6 @@ struct jbserver_domain gRootHideDomain = {
                     { 0 },
             },
         },
-		// JBS_ROOTHIDE_TRUST_EXECUTABLE_RECURSE
-		{
-			.handler = roothide_trust_executable_recurse,
-			.args = (jbserver_arg[]){
-				{ .name = "executable-path", .type = JBS_TYPE_STRING, .out = false },
-				{ .name = "preferred-archs", .type = JBS_TYPE_ARRAY, .out = false },
-				{ 0 },
-			},
-		},
 		// JBS_ROOTHIDE_TRUST_LIBRARY_RECURSE
 		{
 			.handler = roothide_trust_library_recurse,
@@ -212,6 +203,15 @@ struct jbserver_domain gRootHideDomain = {
 				{ .name = "library-path", .type = JBS_TYPE_STRING, .out = false },
 				{ .name = "caller-library-path", .type = JBS_TYPE_STRING, .out = false },
 				{ .name = "caller-executable-path", .type = JBS_TYPE_STRING, .out = false },
+				{ 0 },
+			},
+		},
+		// JBS_ROOTHIDE_TRUST_EXECUTABLE_RECURSE
+		{
+			.handler = roothide_trust_executable_recurse,
+			.args = (jbserver_arg[]){
+				{ .name = "executable-path", .type = JBS_TYPE_STRING, .out = false },
+				{ .name = "preferred-archs", .type = JBS_TYPE_ARRAY, .out = false },
 				{ 0 },
 			},
 		},

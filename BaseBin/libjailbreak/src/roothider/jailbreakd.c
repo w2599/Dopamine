@@ -352,6 +352,22 @@ int jbdSpawnPatchChild(int pid, bool resume)
 	return result;
 }
 
+int jbdSpinlockFixOnly(int pid, bool resume)
+{
+	xpc_object_t message = xpc_dictionary_create_empty();
+	xpc_dictionary_set_uint64(message, "id", JBD_MSG_SPINLOCK_FIX_ONLY);
+	xpc_dictionary_set_int64(message, "pid", pid);
+	xpc_dictionary_set_bool(message, "resume", resume);
+	xpc_object_t reply = jailbreakdXpcRequest(message);
+	xpc_release(message);
+	int64_t result = -1;
+	if (reply) {
+		result  = xpc_dictionary_get_int64(reply, "result");
+		xpc_release(reply);
+	}
+	return result;
+}
+
 int jbdSpawnExecStart(const char* execfile, bool resume)
 {
 	xpc_object_t message = xpc_dictionary_create_empty();

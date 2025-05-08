@@ -96,12 +96,21 @@ int main(int argc, char* argv[])
 
 			JBLogDebug("jailbreakd respawned: %d", pid);
 	
-			if(unrestrict(pid, roothide_patch_proc, true) != 0) {
+			if(unrestrict(pid, proc_patch_dyld, false) != 0) {
 				JBLogError("Failed to unrestrict process %d", pid);
 				return 5;
 			}
-	
-			return 0;
+
+			if(dyld_patch_enabled()) {
+				kill(pid, SIGCONT);
+				return 0;
+			} else {
+				kill(pid, SIGKILL);
+
+				int status;
+				waitpid(pid, &status, WEXITED);
+				waitpid(pid, &status, 0);
+			}
 		}
 
 		JBLogDebug("check in jailbreakd port...");

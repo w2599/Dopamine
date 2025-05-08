@@ -1,10 +1,12 @@
 #import <Foundation/Foundation.h>
 
 #include <stdio.h>
+#include <dlfcn.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <mach-o/dyld.h>
 #include <mach-o/dyld_images.h>
+#include <CoreSymbolication.h>
 
 #include "../libjailbreak.h"
 #include "common.h"
@@ -141,6 +143,7 @@ int task_set_dyld_info(uint64_t task, uint64_t addr, uint64_t size)
 
     if(all_image_info_addr_offset==0 || all_image_info_size_offset==0) {
         JBLogError("invalid all_image_info_addr/size offset");
+        abort();
         return -1;
     }
 
@@ -149,6 +152,7 @@ int task_set_dyld_info(uint64_t task, uint64_t addr, uint64_t size)
         kwritebuf(task + info_offset, info, sizeof(info));
     } else if(task != proc_task(proc_find(1))) {
         JBLogError("invalid info offset");
+        abort();
         return -1;
     }
 
@@ -244,6 +248,8 @@ struct DYLDINFO {
     void*    imageAddress;
     uint64_t all_image_info_addr;
     uint64_t all_image_info_size;
+    uint64_t loadDyldCache_function;
+    uint64_t loadDyldCache_trampoline;
 };
 
 struct DYLDINFO* loadDyldInfo(const char* path)
@@ -256,6 +262,29 @@ struct DYLDINFO* loadDyldInfo(const char* path)
 
     struct DYLDINFO* result = malloc(sizeof(struct DYLDINFO));
     memset(result, 0, sizeof(struct DYLDINFO));
+
+    void *csHandle = dlopen("/System/Library/PrivateFrameworks/CoreSymbolication.framework/CoreSymbolication", RTLD_NOW);
+	CSSymbolicatorRef (*__CSSymbolicatorCreateWithPathAndArchitecture)(const char* path, cpu_type_t type) = dlsym(csHandle, "CSSymbolicatorCreateWithPathAndArchitecture");
+	CSSymbolRef (*__CSSymbolicatorGetSymbolWithMangledNameAtTime)(CSSymbolicatorRef cs, const char* name, uint64_t time) = dlsym(csHandle, "CSSymbolicatorGetSymbolWithMangledNameAtTime");
+	CSRange (*__CSSymbolGetRange)(CSSymbolRef sym) = dlsym(csHandle, "CSSymbolGetRange");
+
+	CSSymbolicatorRef symbolicator = __CSSymbolicatorCreateWithPathAndArchitecture(path, CPU_TYPE_ARM64);
+	CSSymbolRef symbol = __CSSymbolicatorGetSymbolWithMangledNameAtTime(symbolicator, "__ZN5dyld313loadDyldCacheERKNS_18SharedCacheOptionsEPNS_19SharedCacheLoadInfoE", 0);
+	CSRange range = __CSSymbolGetRange(symbol);
+
+    if(range.location == 0) {
+        JBLogError("loadDyldInfo: symbol not found");
+        goto failed;
+    }
+
+    result->loadDyldCache_function = range.location;
+    JBLogDebug("loadDyldCache function: %llx", result->loadDyldCache_function);
+
+    symbol = __CSSymbolicatorGetSymbolWithMangledNameAtTime(symbolicator, "_ORIG__ZN5dyld313loadDyldCacheERKNS_18SharedCacheOptionsEPNS_19SharedCacheLoadInfoE", 0);
+    range = __CSSymbolGetRange(symbol);
+    result->loadDyldCache_trampoline = range.location;
+    JBLogDebug("loadDyldCache orig trampoline: %llx", result->loadDyldCache_trampoline);
+
 
     fd = open(path, O_RDONLY);
     if(fd<0) {
@@ -479,7 +508,84 @@ br   x0
     return 0;
 }
 
-int proc_patch_dyld(pid_t pid)
+int hook_dyld_function(mach_port_t task, uint64_t old_func, uint64_t new_func, uint64_t orig_func)
+{
+/*
+movz x17, 0x0000, lsl 48
+movk x17, 0x0000, lsl 32
+movk x17, 0x0000, lsl 16
+movk x17, 0x0000
+br   x17
+*/
+#define HOOK_CODE_TEMPLATE { \
+    0xD2E00011, \
+    0xF2C00011, \
+    0xF2A00011, \
+    0xF2800011, \
+    0xD61F0220  \
+}
+
+    uint32_t tramp[] = HOOK_CODE_TEMPLATE;
+    tramp[0] |= (((old_func+sizeof(tramp)) >> 48) & 0xffff) << 5;
+    tramp[1] |= (((old_func+sizeof(tramp)) >> 32) & 0xffff) << 5;
+    tramp[2] |= (((old_func+sizeof(tramp)) >> 16) & 0xffff) << 5;
+    tramp[3] |= (((old_func+sizeof(tramp)) >>  0) & 0xffff) << 5;
+
+    kern_return_t kr = vm_protect(task, (vm_address_t)orig_func, sizeof(tramp)*2, false, VM_PROT_READ|VM_PROT_WRITE|VM_PROT_COPY);
+    if(kr != KERN_SUCCESS) {
+        JBLogError("vm_protect rw(cpoy) failed: %d,%s", kr, mach_error_string(kr));
+        return -1;
+    }
+
+    kr = vm_copy(task, (vm_address_t)old_func, sizeof(tramp), (vm_address_t)orig_func);
+    if(kr != KERN_SUCCESS) {
+        JBLogError("vm_copy failed: %d,%s", kr, mach_error_string(kr));
+        return -1;
+    }
+
+    kr = vm_write(task, (vm_address_t)(orig_func+sizeof(tramp)), (vm_offset_t)tramp, sizeof(tramp));
+    if(kr != KERN_SUCCESS) {
+        JBLogError("vm_write failed: %d,%s", kr, mach_error_string(kr));
+        return -1;
+    }
+
+    kr = vm_protect(task, (vm_address_t)orig_func, sizeof(tramp)*2, false, VM_PROT_READ|VM_PROT_EXECUTE);
+    if(kr != KERN_SUCCESS) {
+        JBLogError("vm_protect rx failed: %d,%s", kr, mach_error_string(kr));
+        return -1;
+    }
+
+
+
+    uint32_t codes[] = HOOK_CODE_TEMPLATE;
+
+    codes[0] |= ((new_func >> 48) & 0xffff) << 5;
+    codes[1] |= ((new_func >> 32) & 0xffff) << 5;
+    codes[2] |= ((new_func >> 16) & 0xffff) << 5;
+    codes[3] |= ((new_func >>  0) & 0xffff) << 5;
+
+    kr = vm_protect(task, (vm_address_t)old_func, sizeof(codes), false, VM_PROT_READ|VM_PROT_WRITE|VM_PROT_COPY);
+    if(kr != KERN_SUCCESS) {
+        JBLogError("vm_protect rw(cpoy) failed: %d,%s", kr, mach_error_string(kr));
+        return -1;
+    }
+
+    kr = vm_write(task, (vm_address_t)old_func, (vm_offset_t)codes, sizeof(codes));
+    if(kr != KERN_SUCCESS) {
+        JBLogError("vm_write failed: %d,%s", kr, mach_error_string(kr));
+        return -1;
+    }
+
+    kr = vm_protect(task, (vm_address_t)old_func, sizeof(void*), false, VM_PROT_READ|VM_PROT_EXECUTE);
+    if(kr != KERN_SUCCESS) {
+        JBLogError("vm_protect rx failed: %d,%s", kr, mach_error_string(kr));
+        return -1;
+    }
+
+    return 0;
+}
+
+int proc_patch_dyld_internal(pid_t pid, bool spinlockFixOnly)
 {
     int ret = 0;
 
@@ -539,6 +645,34 @@ int proc_patch_dyld(pid_t pid)
     if(!mach_task) {
         JBLogError("proc_task %d failed", pid);
         goto failed;
+    }
+
+    if(spinlockFixOnly)
+    {
+        uint64_t loadDyldCache_old = dyld_address + stockDyldInfo->loadDyldCache_function;
+        uint64_t loadDyldCache_new = remoteLoadAddress + patchedDyldInfo->loadDyldCache_function;
+        uint64_t loadDyldCache_orig = remoteLoadAddress + patchedDyldInfo->loadDyldCache_trampoline;
+
+        cs_allow_invalid(bsd_proc, false);
+
+        if(hook_dyld_function(task, loadDyldCache_old, loadDyldCache_new, loadDyldCache_orig) != 0) {
+            JBLogError("hook dyld loadDyldCache failed");
+            goto failed;
+        }
+
+        if(task_set_dyld_info(mach_task, dyld_address + stockDyldInfo->all_image_info_addr, stockDyldInfo->all_image_info_size) != 0) {
+            JBLogError("task_set_dyld_info failed");
+            goto failed;
+        }
+
+        //destroy macho header
+        kr = vm_deallocate(task, remoteLoadAddress, PAGE_SIZE);
+        if(kr != KERN_SUCCESS) {
+            JBLogError("vm_deallocate failed: %d,%s", kr, mach_error_string(kr));
+            goto failed;
+        }
+
+        goto final;
     }
 
     void* new_entry = (void*)(remoteLoadAddress + patchedDyldInfo->entrypoint);
@@ -656,4 +790,14 @@ failed:
 final:
     if(MACH_PORT_VALID(task)) mach_port_deallocate(mach_task_self(), task);
     return ret;
+}
+
+int proc_patch_dyld(pid_t pid)
+{
+    return proc_patch_dyld_internal(pid, false);
+}
+
+int proc_fix_spinlock(pid_t pid)
+{
+    return proc_patch_dyld_internal(pid, true);
 }

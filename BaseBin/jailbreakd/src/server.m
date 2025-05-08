@@ -41,6 +41,29 @@ void jailbreakd_received_message(mach_port_t port)
 			if(desc) free(desc);
 
 			switch (msgId) {
+				case JBD_MSG_SPINLOCK_FIX_ONLY: {
+					int64_t result = 0;
+					pid_t pid = xpc_dictionary_get_int64(message, "pid");
+					bool resume = xpc_dictionary_get_bool(message, "resume");
+					pid_t ppid = proc_get_ppid(pid);
+					if(ppid == clientPid) {
+						JBLogDebug("spinlock fix: client pid=%d, child pid=%d, child's parent pid=%d, child proc=%s", clientPid, pid, ppid, proc_get_path(pid,NULL));
+
+						if(proc_fix_spinlock(pid) == 0) {
+							if(resume) kill(pid, SIGCONT);
+						} else {
+							JBLogError("spinlock fix failed: %d", pid);
+							result = -1;
+						}
+
+					} else {
+						JBLogError("spinlock fix denied: %d", pid);
+						result = -1;
+					}
+					xpc_dictionary_set_int64(reply, "result", result);
+					break;
+				}
+
 				case JBD_MSG_SPAWN_PATCH_CHILD: {
 					int64_t result = 0;
 					pid_t pid = xpc_dictionary_get_int64(message, "pid");

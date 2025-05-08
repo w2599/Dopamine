@@ -34,6 +34,7 @@ struct system_info {
 /************ roothide specfic *********/
 		uint64_t jbrand;
 		uint64_t palera1n;
+		bool dyld_patch_enabled;
 /************ roothide specfic *********/
 	} jailbreakInfo;
 
@@ -263,6 +264,7 @@ extern struct system_info gSystemInfo;
 	\
 	iterator(ctx, jailbreakInfo.jbrand); \
 	iterator(ctx, jailbreakInfo.palera1n); \
+	iterator(ctx, jailbreakInfo.dyld_patch_enabled); \
 	\
 	\
 	iterator(ctx, jailbreakInfo.usesPACBypass); \

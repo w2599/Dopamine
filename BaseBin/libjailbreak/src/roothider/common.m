@@ -143,13 +143,34 @@ int unrestrict(pid_t pid, int (*callback)(pid_t), bool resume)
     return 0;
 }
 
-int roothide_patch_proc(pid_t pid)
+bool process_force_dyld_patch(const char* path, const char** argv)
 {
-    // return proc_patch_csflags(pid);
+    if(!path && !argv) return false;
 
-    return proc_patch_dyld(pid);
+    if(__builtin_available(iOS 16.0, *))
+    {
+        if(string_has_suffix(path, "/System/Library/Frameworks/WebKit.framework/XPCServices/com.apple.WebKit.WebContent.xpc/com.apple.WebKit.WebContent")) {
+            return true;
+        }
+        else if(strcmp(path, "/usr/libexec/xpcproxy")==0) {
+            if (argv && argv[0] && argv[1] && string_has_prefix(argv[1], "com.apple.WebKit.WebContent")) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
+bool dyld_patch_enabled()
+{
+    return true;
+    // return jbinfo(dyld_patch_enabled);
+}
+
+int roothide_patch_proc(pid_t pid)
+{
+    return dyld_patch_enabled() ? proc_patch_dyld(pid) : proc_patch_csflags(pid);
+}
 
 bool string_has_prefix(const char *str, const char* prefix)
 {

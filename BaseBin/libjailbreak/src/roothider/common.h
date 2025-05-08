@@ -8,8 +8,11 @@ extern bool launchdhookFirstLoad;
 /* as abort_with_* causes a SIGABRT, we need to use this instead */
 void launchd_panic(const char* fmt, ...);
 
+bool dyld_patch_enabled();
+
 bool proc_cantrace(pid_t pid);
 int proc_patch_dyld(pid_t pid);
+int proc_fix_spinlock(pid_t pid);
 int proc_patch_csflags(pid_t pid);
 pid_t proc_get_ppid(pid_t pid);
 int proc_get_pidversion(pid_t pid);

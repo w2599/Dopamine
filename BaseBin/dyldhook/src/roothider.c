@@ -38,3 +38,18 @@ bool HOOK(_ZN5dyld46Loader18expandAtLoaderPathERNS_12RuntimeStateEPKcRKNS0_11Loa
     return ret;
 }
 
+bool SPINLOCK_FIX_DISABLED = false;
+
+void dyldhook_init_roothide(uintptr_t kernelParams)
+{
+#if IOS==15 && __arm64e__
+	uintptr_t argc = *(uintptr_t *)(kernelParams + sizeof(void *));
+	char **envp = (char **)(kernelParams + sizeof(void *) + sizeof(argc) + (sizeof(const char *) * argc) + sizeof(void *));
+	
+    //when we disable dyld patch globally, we may still inject dyld patch for some processes such as WebContent, but we don't need spinlock fix
+    // but dyldpatch for WebContent is only for ios16???
+	if(_simple_getenv(envp, "SPINLOCK_FIX_DISABLED")) {
+		SPINLOCK_FIX_DISABLED = true;
+	}
+#endif
+}

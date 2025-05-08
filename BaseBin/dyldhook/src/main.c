@@ -62,6 +62,10 @@ void dyldhook_perform_checkin(void)
 
 void dyldhook_init(uintptr_t kernelParams)
 {
+	extern void dyldhook_init_roothide(uintptr_t);
+	dyldhook_init_roothide(kernelParams);
+
+
 	// If we are in launchd, bail out
 	if (getpid() == 1) {
 		return;
