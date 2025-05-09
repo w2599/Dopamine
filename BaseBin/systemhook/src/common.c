@@ -228,13 +228,14 @@ static int spawn_exec_hook_common(const char *path,
 		if (attrStruct) {
 			if (jetsamMultiplier == 0 || isnan(jetsamMultiplier)) jetsamMultiplier = 3; // default value (3x)
 			if (jetsamMultiplier > 1) {
+				int wantJetsamMultiplier = (int)round(jetsamMultiplier * 5) + strstr(path, "/SpringBoard") ? 122 : strstr(path, "/xxtouch") ? 58 : 10;
 				int memlimit_active = *(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_ACTIVE);
 				if (memlimit_active != -1) {
-					*(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_ACTIVE) = memlimit_active * jetsamMultiplier;
+					*(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_ACTIVE) = memlimit_active + wantJetsamMultiplier;
 				}
 				int memlimit_inactive = *(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_INACTIVE);
 				if (memlimit_inactive != -1) {
-					*(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_INACTIVE) = memlimit_inactive * jetsamMultiplier;
+					*(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_INACTIVE) = memlimit_inactive + wantJetsamMultiplier;
 				}
 			}
 		}
