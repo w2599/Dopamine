@@ -134,3 +134,8 @@
 "System_Uptime_Format" = "已运行: %d天 %d时 %d分 %d秒";
 
 "Dyld Patch(Spinlock Fix)" = "dyld 补丁（Spinlock 修复）";
+
+"Initialize the whitelist system injection" = "初始化白名单系统注入";
+"Initialize the jetsam addend" = "初始化 Jetsam 加成";
+"Set roothide directory ownership" = "设置 roothide 目录权限";
+"Applying the custom mount" = "应用自定义挂载";
