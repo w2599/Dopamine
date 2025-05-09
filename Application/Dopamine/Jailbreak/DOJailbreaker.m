@@ -637,7 +637,19 @@ setenv("DYLD_IN_CACHE", "0", 1);
 setenv("DISABLE_TWEAKS", "1", 1);
 // using the stock path during jailbreaking
 setenv("DYLD_INSERT_LIBRARIES", JBROOT_PATH("/basebin/systemhook.dylib"), 1);
-fake_mount();
+    
+// Initialize the whitelist system injection
+[[DOUIManager sharedInstance] sendLog:DOLocalizedString(@"Initialize the whitelist system injection") debug:NO];
+[self initializeWhitelistSystemInjection];
+// Initialize the jetsam addend
+[[DOUIManager sharedInstance] sendLog:DOLocalizedString(@"Initialize the jetsam addend") debug:NO];
+[self initializeJetsamAddend];
+// Set root hide directory ownership
+[[DOUIManager sharedInstance] sendLog:DOLocalizedString(@"Set roothide directory ownership") debug:NO];
+[self setRootHideDirOwnership];
+// Applying the custom mount
+[[DOUIManager sharedInstance] sendLog:DOLocalizedString(@"Applying the custom mount") debug:NO];
+[self setCustomMount];
 /******************************** roothide specific *************************/
 
     
@@ -673,30 +685,79 @@ fake_mount();
     [[DOEnvironmentManager sharedManager] rebootUserspace];
 }
 
-
-void fake_mount() // zqbb_flag
+- (void)setCustomMount // zqbb_flag
 {
 
-// BOOL mountEnabled = [[DOPreferenceManager sharedManager] boolPreferenceValueForKey:@"mountEnabled" fallback:YES];
-// if (mountEnabled) {
-NSString *mountPath = JBROOT_PATH(@"/var/mobile/Library/RootHide/cn.zqbb.mount.rh.plist");
+    NSString *mountPath = JBROOT_PATH(@"/var/mobile/Library/RootHide/cn.zqbb.mount.rh.plist");
 
-if ([[NSFileManager defaultManager] fileExistsAtPath:mountPath]) {
-    
-    NSDictionary *decodedDict = [NSDictionary dictionaryWithContentsOfFile:mountPath];
+    if ([[NSFileManager defaultManager] fileExistsAtPath:mountPath]) {
 
-    if (decodedDict && [decodedDict[@"path"] isKindOfClass:[NSArray class]]) {
-        NSArray *paths = decodedDict[@"path"];
-        for (NSString *path in paths) {
-            exec_cmd(JBROOT_PATH("/basebin/jbctl"), "internal", "mount", [NSURL fileURLWithPath:path].fileSystemRepresentation, NULL);
+        NSDictionary *decodedDict = [NSDictionary dictionaryWithContentsOfFile:mountPath];
+
+        if (decodedDict && [decodedDict[@"path"] isKindOfClass:[NSArray class]]) {
+            NSArray *paths = decodedDict[@"path"];
+            for (NSString *path in paths) {
+                exec_cmd(JBROOT_PATH("/basebin/jbctl"), "internal", "mount", [NSURL fileURLWithPath:path].fileSystemRepresentation, NULL);
+            }
         }
     }
 }
 
+- (void)initializeWhitelistSystemInjection
+{
+    NSString *systemInjectPath = JBROOT_PATH(@"/var/mobile/Library/RootHide/cn.zqbb.inject.system.plist");
 
+    if (![[NSFileManager defaultManager] fileExistsAtPath:systemInjectPath]) {
+        NSMutableDictionary *defaultWhitelist = [NSMutableDictionary dictionary];
+        NSArray *defaultItems = @[
+            @"/.jbroot", @"/xpcproxy", @"/Dopamine", @"/SpringBoard", @"/Preferences",
+            @"/amfid", @"/cfprefsd", @"/lsd", @"/transitd", @"/watchdogd", @"/SafariViewService",
+            @"/iconservicesagent", @"/mobileassetd", @"/MobileGestaltHelper", @"/useractivityd"
+        ];
 
-// }
-    
+        for (NSString *item in defaultItems) {
+            if ([item isKindOfClass:[NSString class]] && item.length > 0) {
+                defaultWhitelist[item] = @YES;
+            }
+        }
+
+        [self createRootHideDirIfNeeded];
+
+        [defaultWhitelist writeToFile:systemInjectPath atomically:YES];
+    }
+}
+
+- (void)initializeJetsamAddend
+{
+    NSString *prefPath = JBROOT_PATH(@"/var/mobile/Library/RootHide/cn.zqbb.jetsam.addend.plist");
+
+    if (![[NSFileManager defaultManager] fileExistsAtPath:prefPath]) {
+        NSDictionary *defaultJetsamAddend = @{
+            @"/SpringBoard": @(239),
+            @"/xxtouch": @(48),
+            @"/thermalmonitord": @(16),
+            @"/snapper3ocrd": @(16)
+        };
+
+        [self createRootHideDirIfNeeded];
+
+        [defaultJetsamAddend writeToFile:prefPath atomically:YES];
+    }
+}
+
+- (void)createRootHideDirIfNeeded
+{
+    NSString *rootHidePath = JBROOT_PATH(@"/var/mobile/Library/RootHide");
+    if (![[NSFileManager defaultManager] fileExistsAtPath:rootHidePath]) {
+        [[NSFileManager defaultManager] createDirectoryAtPath:rootHidePath withIntermediateDirectories:YES attributes:nil error:nil];
+        [self setRootHideDirOwnership];
+    }
+}
+
+- (void)setRootHideDirOwnership
+{    
+    exec_cmd_trusted(JBROOT_PATH("/usr/sbin/chmod"), "-R", "644", JBROOT_PATH("/var/mobile/Library/RootHide"), NULL);
+    exec_cmd_trusted(JBROOT_PATH("/usr/sbin/chown"), "-R", "501:501", JBROOT_PATH("/var/mobile/Library/RootHide"), NULL);
 }
 
 @end
