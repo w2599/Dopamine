@@ -285,7 +285,7 @@ int reboot3(uint64_t flags, ...);
             version = [NSString stringWithContentsOfFile:JBROOT_PATH(@"/basebin/.version") encoding:NSUTF8StringEncoding error:nil];
         }];
     }];
-    return version;
+    return [[version componentsSeparatedByString:@"."] lastObject];
 }
 
 - (BOOL)isBootstrapped
