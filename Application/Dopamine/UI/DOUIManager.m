@@ -37,8 +37,8 @@
 
 - (BOOL)isUpdateAvailable
 {
-    NSString *latestVersion = [self getLatestReleaseTag];
-    NSString *currentVersion = [self getLaunchedReleaseTag];
+    NSString *latestVersion = [self getLatestReleaseTag_zqbb];
+    NSString *currentVersion = [self getLaunchedReleaseTag_zqbb];
     return [latestVersion numericalVersionRepresentation] > [currentVersion numericalVersionRepresentation];
 }
 
@@ -59,7 +59,7 @@
             continue;
         }
         long long numericalVersion = [version numericalVersionRepresentation];
-        if (numericalVersion > startVersion && numericalVersion <= endVersion) {
+        if (numericalVersion >= startVersion && numericalVersion <= endVersion) {
             [updates addObject:release];
         }
     }
@@ -86,13 +86,33 @@
     return releases;
 }
 
+- (NSDictionary *)getLatestReleases_zqbb
+{
+    static dispatch_once_t onceToken;
+    static NSDictionary *release;
+    dispatch_once(&onceToken, ^{
+        NSURL *url = [NSURL URLWithString:@"https://api.github.com/repos/w2599/Dopamine/releases/latest"];
+        NSData *data = [NSData dataWithContentsOfURL:url];
+        if (data) {
+            NSError *error;
+            release = [NSJSONSerialization JSONObjectWithData:data options:kNilOptions error:&error];
+            if (error)
+            {
+                onceToken = 0;
+                release = @{};
+            }
+        }
+    });
+    return release;
+}
+
 - (BOOL)environmentUpdateAvailable
 {
     if (![[DOEnvironmentManager sharedManager] jailbrokenVersion])
         return NO;
 
     NSString *jailbrokenVersion = [[DOEnvironmentManager sharedManager] jailbrokenVersion];
-    NSString *launchedVersion = [self getLaunchedReleaseTag];
+    NSString *launchedVersion = [self getLaunchedReleaseTag_zqbb];
     
     return [launchedVersion numericalVersionRepresentation] > [jailbrokenVersion numericalVersionRepresentation];
 }
@@ -112,6 +132,30 @@
     return [launchedVersion[@"body"] containsString:@"*Manual Updates*"];
 }
 
+- (NSString*)getLatestReleaseTag_zqbb
+{
+    NSDictionary *releases = [self getLatestReleases_zqbb];
+
+    NSArray *assets = releases[@"assets"];
+    if (assets.count > 0) {
+        NSString *latestVersion = nil;
+        NSRegularExpression *regex = [NSRegularExpression regularExpressionWithPattern:@"blacklist.*?\\.\\d+\\.(\\d+)_" options:0 error:nil];
+
+        for (NSDictionary *asset in assets) {
+            NSString *name = asset[@"name"];
+            NSTextCheckingResult *match = [regex firstMatchInString:name options:0 range:NSMakeRange(0, name.length)];
+            if (match) {
+                NSString *version = [name substringWithRange:[match rangeAtIndex:1]];
+                if (!latestVersion || version.integerValue > latestVersion.integerValue) {
+                    latestVersion = version;
+                }
+            }
+        }
+        return latestVersion;
+    }
+    return nil;
+}
+
 - (NSString*)getLatestReleaseTag
 {
     NSArray *releases = [self getLatestReleases];
@@ -126,6 +170,16 @@
 }
 
 - (NSString*)getLaunchedReleaseTag
+{
+    NSString *versionString = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
+    NSArray *components = [versionString componentsSeparatedByString:@"."];
+    if (components.count >= 3) {
+        return components[components.count - 3];
+    }
+    return nil;
+}
+
+- (NSString*)getLaunchedReleaseTag_zqbb
 {
     return [[[[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleShortVersionString"] componentsSeparatedByString:@"."] lastObject];
 }
