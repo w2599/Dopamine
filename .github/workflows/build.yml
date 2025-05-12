@@ -4,7 +4,6 @@ on:
   workflow_dispatch:
 
 env:
-  VERSION: '2.0.11'
   BUNDLEID: 'com.zqbb.Dopamine-roothide'
 
 jobs:
@@ -29,6 +28,37 @@ jobs:
           gmake -j$(sysctl -n hw.physicalcpu) OPENSSL=1
           sudo cp trustcache /opt/procursus/bin/
 
+      - name: Pre env
+        run: |
+          sT=$(TZ=UTC-8 date +'%S')
+          echo "msT=$(TZ=UTC-8 date -j -f "%Y-%m-%d %H:%M:%S" "$(TZ=UTC-8 date +'%Y-%m-%d %H:%M'):${sT}" +%s)" >> $GITHUB_ENV
+          echo "shT=$(TZ=UTC-8 date +'%Y.%m.%d/%H.%M').${sT}" >> $GITHUB_ENV
+          echo "logT=$(TZ=UTC-8 date +'%Y年%m月%d %H:%M'):${sT}" >> $GITHUB_ENV
+          echo "SHASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Pre Version
+        run: |
+          set -x
+          orig_version=$(cat ./BaseBin/_external/basebin/.version)
+          git clone https://github.com/roothide/Dopamine2-roothide.git Dopamine2-roothide
+          cd Dopamine2-roothide
+          commitCount=$(git rev-list --count HEAD)
+          cd ..
+          if [ -n "$commitCount" ]; then
+            echo "$orig_version.$commitCount.${{ env.msT }}" >./BaseBin/_external/basebin/.version
+            echo "newVERSION=$(cat ./BaseBin/_external/basebin/.version)" >> $GITHUB_ENV
+          else
+            exit 1
+          fi
+
+      - name: Log env
+        run: |
+          echo ${{ env.newVERSION }}
+          echo ${{ env.msT }}
+          echo ${{ env.shT }}
+          echo ${{ env.logT }}
+          echo ${{ env.SHASH }}
+
       - name: Pre theos
         run: |
           set -x
@@ -50,43 +80,14 @@ jobs:
           sed -i '' "s/com.opa334.Dopamine-roothide/${{ env.BUNDLEID }}/g" ./Application/Dopamine.xcodeproj/project.pbxproj
           sed -i '' "s/com.opa334.Dopamine-roothide/${{ env.BUNDLEID }}/g" ./BaseBin/jbctl/src/main.m
 
-      - name: Pre Version
-        run: |
-          set -x
-          orig_version=$(cat ./BaseBin/_external/basebin/.version)
-          if [[ "${{ env.VERSION }}" > "$orig_version" ]]; then
-            echo "${{ env.VERSION }}" >./BaseBin/_external/basebin/.version
-            sed -i '' 's/MARKETING_VERSION = .*;/MARKETING_VERSION = ${{ env.VERSION }};/g' ./Application/Dopamine.xcodeproj/project.pbxproj
-          fi
-          echo "newVERSION=$(cat ./BaseBin/_external/basebin/.version)" >> $GITHUB_ENV
-
-      - name: Pre env
-        run: |
-          sT=$(TZ=UTC-8 date +'%S')
-          echo "msT=$(TZ=UTC-8 date -j -f "%Y-%m-%d %H:%M:%S" "$(TZ=UTC-8 date +'%Y-%m-%d %H:%M'):${sT}" +%s)" >> $GITHUB_ENV
-          echo "shT=$(TZ=UTC-8 date +'%Y.%m.%d/%H.%M').${sT}" >> $GITHUB_ENV
-          echo "logT=$(TZ=UTC-8 date +'%Y年%m月%d %H:%M'):${sT}" >> $GITHUB_ENV
-          echo "SHASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-          echo "commitCount=$(curl -s "https://api.github.com/repos/roothide/Dopamine2-roothide/commits?per_page=1" -I | grep -i 'link' | sed -n 's/.*page=\([0-9]*\)>; rel="last".*/\1/p')" >> $GITHUB_ENV
-
-
-      - name: Log env
-        run: |
-          echo ${{ env.newVERSION }}
-          echo ${{ env.msT }}
-          echo ${{ env.shT }}
-          echo ${{ env.logT }}
-          echo ${{ env.SHASH }}
-          echo ${{ env.commitCount }}
-
       - name: Pre code
         run: |
-          sed -i '' "s/AAAA/v${{ env.newVERSION }}  ${{ env.commitCount }}  ${{ env.msT }}/g" ./Application/Dopamine/UI/DOMainViewController.m
+          sed -i '' "s/AAAA/v${{ env.newVERSION }}  (WhiteList)/g" ./Application/Dopamine/UI/DOMainViewController.m
           sed -i '' "s/AAAB/不要为了升级而放弃越狱的乐趣~/g" ./Application/Dopamine/UI/DOMainViewController.m
           sed -i '' "s/AAAB/不要为了升级而放弃越狱的乐趣~/g" ./Application/Dopamine/UI/DOMainViewController.m
           sed -i '' "s/roothide\/Dopamine2-roothide/w2599\/Dopamine\/tree\/rh2.x_modify/g" ./Application/Dopamine/UI/Settings/DOCreditsViewController.m
           sed -i '' "s/roothide\/Dopamine2-roothide/w2599\/Dopamine/g" ./Application/Dopamine/UI/Update/DOUpdateViewController.m
-          sed -i '' "s/roothide\/Dopamine2-roothide/w2599\/Dopamine/g" ./Application/Dopamine/UI/DOUIManager.m
+          # sed -i '' "s/roothide\/Dopamine2-roothide/w2599\/Dopamine/g" ./Application/Dopamine/UI/DOUIManager.m
           
       # - name: Pre body
       #   run: |
@@ -115,9 +116,9 @@ jobs:
           set -x
           export BASEDIR="$(pwd)"
           export THEOS="${BASEDIR}/theos"
-          gmake -j$(sysctl -n hw.physicalcpu) NIGHTLY=1
+          gmake -j$(sysctl -n hw.physicalcpu) NIGHTLY=0
           # cp Dopamine/Dopamine.tipa Dopamine.tipa
-          mv Application/Dopamine.tipa Dopamine_roothide_whitelist_${{ env.newVERSION }}_${{ env.commitCount }}_${{ env.msT }}_${{ env.SHASH }}.tipa
+          mv Application/Dopamine.tipa Dopamine_roothide_whitelist_${{ env.newVERSION }}_${{ env.SHASH }}.tipa
 
       # - name: Release
       #   uses: softprops/action-gh-release@v1
