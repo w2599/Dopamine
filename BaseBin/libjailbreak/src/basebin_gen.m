@@ -135,8 +135,7 @@ int basebin_generate(bool comingFromJBUpdate)
 	}
 
 	carbonCopy(dyldOrigPath, dyldInflightPath);
-
-	NSString *dyldUUIDPrefix = [@"DOPA" stringByAppendingString:dopamineVersion];
+	NSString *dyldUUIDPrefix = [[@"DOPA" stringByAppendingString:dopamineVersion] substringToIndex:MIN(15, 4 + dopamineVersion.length)];
 	if (apply_dyld_patch(dyldInflightPath, dyldUUIDPrefix.UTF8String) != 0) return 2;
 	if (merge_dyldhook(dyldInflightPath, dyldInflightPath) != 0) return 3;
 	if (resign_file(dyldInflightPath, @"com.apple.dyld", YES) != 0) return 4;
