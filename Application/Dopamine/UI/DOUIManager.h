@@ -33,6 +33,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)isUpdateAvailable;
 - (BOOL)environmentUpdateAvailable;
 - (NSArray *)getLatestReleases;
+- (NSString*)getVersionTag;
 - (NSString*)getLaunchedReleaseTag;
 - (NSString*)getLatestReleaseTag;
 - (NSArray *)getUpdatesInRange:(NSString *)start end:(NSString *)end;
