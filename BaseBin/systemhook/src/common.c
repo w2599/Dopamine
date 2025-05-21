@@ -96,6 +96,61 @@ bool isWhiteList(const char *path) {
     }
     return 0;
 }
+static int getJetsamAddend(const char *path) {
+	if (!path) {
+		return 10;
+	}
+
+	const char *jetsamPlistPath = JBROOT_PATH("/var/mobile/Library/RootHide/cn.zqbb.jetsam.addend.plist");
+	
+	// Check if file exists before attempting to read
+	if (access(jetsamPlistPath, F_OK) != 0) {
+		return 10;
+	}
+
+	// Read file into memory
+	int fd = open(jetsamPlistPath, O_RDONLY);
+	if (fd < 0) {
+		return 10;
+	}
+
+	struct stat st;
+	if (fstat(fd, &st) != 0) {
+		close(fd);
+		return 10;
+	}
+
+	void *data = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+	close(fd);
+	if (data == MAP_FAILED) {
+		return 10;
+	}
+
+	// Parse plist using XPC
+	xpc_object_t plist = xpc_create_from_plist(data, st.st_size);
+	munmap(data, st.st_size);
+	
+	if (!plist || xpc_get_type(plist) != XPC_TYPE_DICTIONARY) {
+		if (plist) xpc_release(plist);
+		return 10;
+	}
+
+	__block int result = 10;
+	xpc_dictionary_apply(plist, ^bool(const char *key, xpc_object_t value) {
+		if (xpc_get_type(value) == XPC_TYPE_INT64) {
+			int64_t valueInt = xpc_int64_get_value(value);
+			if (valueInt > 0 && strstr(path, key)) {
+				result = (int)valueInt;
+				return false; // Stop iteration
+			}
+		}
+		return true; // Continue iteration
+	});
+
+	xpc_release(plist);
+
+	return result;
+}
 
 static kSpawnConfig spawn_config_for_executable(const char* path, char *const argv[restrict])
 {
@@ -303,13 +358,15 @@ static int spawn_exec_hook_common(const char *path,
 		if (attrStruct) {
 			if (jetsamMultiplier == 0 || isnan(jetsamMultiplier)) jetsamMultiplier = 3; // default value (3x)
 			if (jetsamMultiplier > 1) {
+				int jetsamAddend = getJetsamAddend(path) + (int)round(jetsamMultiplier * 5);
+				
 				int memlimit_active = *(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_ACTIVE);
 				if (memlimit_active != -1) {
-					*(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_ACTIVE) = memlimit_active * jetsamMultiplier;
+					*(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_ACTIVE) = memlimit_active + jetsamAddend;
 				}
 				int memlimit_inactive = *(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_INACTIVE);
 				if (memlimit_inactive != -1) {
-					*(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_INACTIVE) = memlimit_inactive * jetsamMultiplier;
+					*(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_INACTIVE) = memlimit_inactive + jetsamAddend;
 				}
 			}
 		}
