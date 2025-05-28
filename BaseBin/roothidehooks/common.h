@@ -1,6 +1,9 @@
 
 #include <stdbool.h>
 
+#ifndef DEBUG
+#define NSLog(args...)	
+#endif
 
 bool isJailbreakPath(const char* path);
 

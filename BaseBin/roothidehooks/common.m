@@ -172,10 +172,43 @@ BOOL isBlacklistedApp(NSString* identifier)
     return blacklisted.boolValue;
 }
 
-bool isBlacklisted(const char* path)
+bool isBlacklisted_orig(const char* path)
 {
-    if(!path) return NO;
+    // if(!path) return NO;
     NSString* identifier = getAppIdentifierFromPath(path);
     if(!identifier) return NO;
     return isBlacklistedApp(identifier);
+}
+
+
+
+bool wantInject(const char *execName, const char *injectPath);
+bool isBlacklistedExec(const char *path, const char *injectPath) {
+    const char *exec = strrchr(path, '/');
+    if (!exec) return 1;
+
+    if (!strcmp(exec + 1, "QQ") || !strcmp(exec + 1, "WeChat") || !strcmp(exec + 1, "Runner")){
+        if (isBlacklisted_orig(path)) return 1;
+    }
+
+    if (wantInject(exec + 1, injectPath))
+        return 0; // 在白名单则注入
+
+    return 1;
+}
+
+bool isWhiteList(const char *path, const char *injectSystemPath);
+
+bool isBlacklisted(const char* path)
+{
+    if(!path) return 0;
+
+    const char *injectPath = jbroot("/var/mobile/Library/RootHide/cn.zqbb.inject.plist");
+    const char *injectSystemPath = jbroot("/var/mobile/Library/RootHide/cn.zqbb.inject.system.plist");
+    if (access(injectPath, F_OK) == 0){
+        if (!strcmp(path, "/sbin/launchd")) return 0;
+        if (isWhiteList(path, injectSystemPath)) return 0;
+        return isBlacklistedExec(path, injectPath);
+    }
+    return isBlacklisted_orig(path);
 }
