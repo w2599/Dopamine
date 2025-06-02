@@ -1,4 +1,4 @@
-TARGET := iphone:clang:latest:15.0
+TARGET := iphone:clang:16.5:15.0
 INSTALL_TARGET_PROCESSES = lsd cfprefsd
 FINALPACKAGE = 1
 THEOS_PACKAGE_SCHEME = roothide
@@ -9,7 +9,7 @@ include $(THEOS)/makefiles/common.mk
 TWEAK_NAME = roothidehooks
 
 roothidehooks_FILES = $(wildcard *.x) $(wildcard *.c) $(wildcard *.m)
-roothidehooks_CFLAGS = -Werror -fobjc-arc -I../.include
+roothidehooks_CFLAGS = -Werror -fobjc-arc -I../.include -O2
 roothidehooks_LDFLAGS = -rpath @loader_path/.jbroot/Library/Frameworks -rpath @loader_path/fallback -L../libjailbreak -ljailbreak
 
 lsd.x_CFLAGS = -fno-objc-arc #lsd using mrc
