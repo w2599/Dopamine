@@ -114,3 +114,23 @@
 "Status_Title_Select_Package_Managers" = "Chọn trình quản lý gói";
 "Select_Package_Managers_Install_Message" = "Nếu bạn không biết nên nhấn vào lựa chọn nào, hãy chọn Sileo (sẽ không bao giờ có Cydia cho bạn chọn)";
 "Continue" = "Tiếp tục";
+
+// mount 
+"Input_Mmount_Title" = "Mount";
+"Input_Unmount_Title" = "Quản lí Mount";
+"Input_Mount_Title" = "Nhập đường dẫn";
+"Error_Mount_Body" = "Không tồn tại đường dẫn";
+"Select_Mount_Title" = "Chọn đường dẫn";
+"Button_Delete_Path_Only" = "Chỉ xóa đường dẫn";
+"Button_Delete" = "Xóa toàn bộ";
+"Button_View" = "Mở trong Filza";
+"Button_Mount" = "OK";
+
+"Input_Unmount_Title_B" = "Nhập đường dẫn";
+"Input_Unmount_Path" = "Nhập đường dẫn";
+"Button_Unmount" = "OK";
+"System_Uptime_Format" = "%d Ngày %d Giờ %d phút %d giây";
+
+"Enable dyld patch" = "Bật Dyld Patch";
+"Dyld Patch(Spinlock Fix)" = "Dyld Patch（Spinlock Fix）";
+"When spinlock fix is ​​enabled, app extensions of blacklisted apps will be disabled and may also cause spinlock panics when the blacklisted app is in foreground/background.\n\nYou can first try disabling tweak injection for the app in Choicy (spinlock fix still works), and only blacklist the app if that doesn't work." = "Khi bật sửa lỗi spinlock, các phần mở rộng của ứng dụng bị đưa vào danh sách đen sẽ bị vô hiệu hóa. Nếu ứng dụng này hoạt động ở chế độ nền hoặc được mở ở giao diện chính, nó có thể gây ra lỗi nghiêm trọng với spinlock.Bạn có thể thử tắt việc tiêm tweak cho ứng dụng đó bằng Choicy (sửa lỗi spinlock vẫn có hiệu lực). Nếu cách này không hiệu quả, hãy đưa ứng dụng vào danh sách đen.";
