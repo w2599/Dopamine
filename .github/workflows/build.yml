@@ -82,9 +82,9 @@ jobs:
 
       - name: Pre code
         run: |
-          sed -i '' "s/AAAA/v${{ env.newVERSION }}  (WhiteList)/g" ./Application/Dopamine/UI/DOMainViewController.m
-          sed -i '' "s/AAAB/不要为了升级而放弃越狱的乐趣~/g" ./Application/Dopamine/UI/DOMainViewController.m
-          sed -i '' "s/AAAB/不要为了升级而放弃越狱的乐趣~/g" ./Application/Dopamine/UI/DOMainViewController.m
+          sed -i '' "s/AAAA/v${{ env.newVERSION }}(WhiteList)/g" ./Application/Dopamine/UI/DOMainViewController.m
+          sed -i '' "s/AAAB//g" ./Application/Dopamine/UI/DOMainViewController.m
+          sed -i '' "s/AAAB//g" ./Application/Dopamine/UI/DOMainViewController.m
           sed -i '' "s/roothide\/Dopamine2-roothide/w2599\/Dopamine\/tree\/rh2.x_modify/g" ./Application/Dopamine/UI/Settings/DOCreditsViewController.m
           sed -i '' "s/roothide\/Dopamine2-roothide/w2599\/Dopamine/g" ./Application/Dopamine/UI/Update/DOUpdateViewController.m
           # sed -i '' "s/roothide\/Dopamine2-roothide/w2599\/Dopamine/g" ./Application/Dopamine/UI/DOUIManager.m
@@ -118,7 +118,7 @@ jobs:
           export THEOS="${BASEDIR}/theos"
           gmake -j$(sysctl -n hw.physicalcpu) NIGHTLY=0
           # cp Dopamine/Dopamine.tipa Dopamine.tipa
-          mv Application/Dopamine.tipa Dopamine_roothide_whitelist_${{ env.newVERSION }}_${{ env.SHASH }}.tipa
+          mv Application/Dopamine.tipa Dopamine_roothide_whitelist_${{ env.newVERSION }}.tipa
 
       # - name: Release
       #   uses: softprops/action-gh-release@v1
