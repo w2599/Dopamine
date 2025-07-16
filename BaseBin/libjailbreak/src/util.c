@@ -312,13 +312,14 @@ int pmap_expand_range(uint64_t pmap, uint64_t vaStart, uint64_t size)
 		}
 	}
 	else {
-		uint64_t vaEnd = vaStart + size;
-		for (uint64_t va = vaStart; va < vaEnd; va += vm_real_kernel_page_size) {
+		uint64_t l2Start = (vaStart & ~L2_BLOCK_MASK);
+		uint64_t l2End   = (((vaStart + size) + (L2_BLOCK_SIZE-1)) & ~L2_BLOCK_MASK);
+		for (uint64_t va = l2Start; va < l2End; va += L2_BLOCK_SIZE) {
 			uint64_t leafLevel;
 			do {
 				leafLevel = PMAP_TT_L3_LEVEL;
-				uint64_t pt = 0;
-				vtophys_lvl(ttep, va, &leafLevel, &pt);
+				uint64_t pte = 0;
+				vtophys_lvl(ttep, va, &leafLevel, &pte);
 				if (leafLevel != PMAP_TT_L3_LEVEL) {
 					uint64_t pt_va = 0;
 					switch (leafLevel) {
@@ -331,9 +332,10 @@ int pmap_expand_range(uint64_t pmap, uint64_t vaStart, uint64_t size)
 							break;
 						}
 					}
+					leafLevel++;
 					uint64_t newTable = pmap_alloc_page_table(pmap, pt_va);
 					if (newTable) {
-						physwrite64(pt, newTable | ARM_TTE_VALID | ARM_TTE_TYPE_TABLE);
+						physwrite64(pte, newTable | ARM_TTE_VALID | ARM_TTE_TYPE_TABLE);
 					}
 					else {
 						return -2;
