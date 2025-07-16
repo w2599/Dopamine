@@ -6,13 +6,7 @@
 #include <pthread.h>
 #include <mach-o/dyld.h>
 #include <dlfcn.h>
-
-#define OS_ALLOC_ONCE_KEY_MAX    100
-
-struct _os_alloc_once_s {
-	long once;
-	void *ptr;
-};
+#include <os/alloc_once_private.h>
 
 struct xpc_global_data {
 	uint64_t    a;
@@ -23,9 +17,6 @@ struct xpc_global_data {
 #endif
 	xpc_object_t    xpc_bootstrap_pipe;   /* 0x18 */
 };
-
-extern struct _os_alloc_once_s _os_alloc_once_table[];
-extern void* _os_alloc_once(struct _os_alloc_once_s *slot, size_t sz, os_function_t init);
 
 mach_port_t gJBServerCustomPort = MACH_PORT_NULL;
 
@@ -48,15 +39,7 @@ xpc_object_t jbserver_xpc_send_dict(xpc_object_t xdict)
 	}
 	else {
 		// Else, communicate with launchd
-		struct xpc_global_data* globalData = NULL;
-		if (_os_alloc_once_table[1].once == -1) {
-			globalData = _os_alloc_once_table[1].ptr;
-		}
-		else {
-			globalData = _os_alloc_once(&_os_alloc_once_table[1], 472, NULL);
-			if (!globalData) _os_alloc_once_table[1].once = -1;
-		}
-		if (!globalData) return NULL;
+		struct xpc_global_data* globalData = os_alloc_once(OS_ALLOC_ONCE_KEY_LIBXPC, 472, NULL);
 		if (!globalData->xpc_bootstrap_pipe) {
 			mach_port_t *initPorts;
 			mach_msg_type_number_t initPortsCount = 0;
