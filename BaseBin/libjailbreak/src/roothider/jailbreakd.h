@@ -20,8 +20,8 @@ int initJailbreakd(bool firstLoad);
 
 void setJailbreakdProcess(pid_t pid);
 
-mach_port_t jailbreakdClientPort();
-mach_port_t jailbreakdServerPort();
+mach_port_t jailbreakdClientPort(void);
+mach_port_t jailbreakdServerPort(void);
 
 int jbdTestCall(int value);
 int jbdSystemwideLog(const char* fmt, ...);

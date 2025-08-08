@@ -8,7 +8,7 @@ extern bool launchdhookFirstLoad;
 /* as abort_with_* causes a SIGABRT, we need to use this instead */
 void launchd_panic(const char* fmt, ...);
 
-bool dyld_patch_enabled();
+bool dyld_patch_enabled(void);
 bool process_force_dyld_patch(const char* path, const char** argv);
 int roothide_config_set_spinlock_fix(bool enabled);
 
@@ -32,7 +32,7 @@ bool isBlacklistedPath(const char* path);
 bool isBlacklistedToken(audit_token_t* token);
 bool isBlacklistedPid(pid_t pid);
 
-pid_t* allocBlacklistProcessId();
+pid_t* allocBlacklistProcessId(void);
 void commitBlacklistProcessId(pid_t* pidp);
 
 bool isRemovableBundlePath(const char* path);
@@ -61,9 +61,9 @@ char* generate_sandbox_extensions(audit_token_t *processToken, bool writable);
 
 int randomizeAndLoadBasebinTrustcache(const char* basebinPath);
 
-bool otherJailbreakActived();
+bool otherJailbreakActived(void);
 
-void hideDeveloperMode();
+void hideDeveloperMode(void);
 
 void exec_set_patch(bool enabled);
 int exec_cmd_roothide_spawn(pid_t* pidp, const char* path, const posix_spawn_file_actions_t *fap, const posix_spawnattr_t *attrp, char *const argv[], char *const envp[]);

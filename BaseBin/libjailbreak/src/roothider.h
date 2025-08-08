@@ -10,7 +10,7 @@
 #include "roothider/xpc_private.h"
 #include "roothider/crashreporter.h"
 
-extern int roothide_unsupport_request();
+extern int roothide_unsupport_request(void);
 extern bool roothide_domain_allowed(audit_token_t clientToken);
 
 #endif // ROOTHIDER_H
