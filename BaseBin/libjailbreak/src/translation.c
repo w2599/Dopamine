@@ -17,9 +17,9 @@ struct tt_level arm_tt_level[4];
 
 // Address translation physical <-> virtual
 
+#define PTOV_TABLE_SIZE 8
 uint64_t phystokv(uint64_t pa)
 {
-	const uint64_t PTOV_TABLE_SIZE = 8;
 	struct ptov_table_entry {
 		uint64_t pa;
 		uint64_t va;

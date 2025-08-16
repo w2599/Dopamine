@@ -820,23 +820,23 @@ static void* worker_thread(void *arg)
 }
 
 // A thread to alternately spin and sleep.
+#define ACTIVITY_WORKER_COUNT 10
 static void* activity_thread(void *arg)
 {
 	volatile uint64_t *runCount = arg;
 	struct mach_timebase_info tb;
 	mach_timebase_info(&tb);
 	const unsigned milliseconds = 40;
-	const unsigned worker_count = 10;
 	while (*runCount != 0) {
 		// Spin for one period on multiple threads.
 		uint64_t start = mach_absolute_time();
 		uint64_t end = start + milliseconds * 1000 * 1000 * tb.denom / tb.numer;
-		pthread_t worker[worker_count];
-		for (unsigned i = 0; i < worker_count; i++) {
+		pthread_t worker[ACTIVITY_WORKER_COUNT];
+		for (unsigned i = 0; i < ACTIVITY_WORKER_COUNT; i++) {
 			pthread_create(&worker[i], NULL, worker_thread, &end);
 		}
 		worker_thread(&end);
-		for (unsigned i = 0; i < worker_count; i++) {
+		for (unsigned i = 0; i < ACTIVITY_WORKER_COUNT; i++) {
 			pthread_join(worker[i], NULL);
 		}
 		// Sleep for one period.
