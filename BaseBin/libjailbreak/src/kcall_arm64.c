@@ -9,7 +9,7 @@
 // I don't like this as it breaks executing multiple threads at the same time
 // But as we don't even really do/support that currently anyways, it doesn't matter
 uint64_t getUserReturnThreadContext(void);
-extern uint64_t gUserReturnDidHappen;
+extern volatile uint64_t gUserReturnDidHappen;
 
 #ifndef __arm64e__
 
