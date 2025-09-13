@@ -183,18 +183,31 @@ bool isBlacklisted_orig(const char* path)
 
 
 bool wantInject(const char *execName, const char *injectPath);
+
+BOOL isWantsBlacklist(NSString *execName)
+{
+    if(!execName) return NO;
+
+    NSString* configFilePath = jbroot(@"/var/mobile/Library/RootHide/cn.zqbb.inject.wantsblacklist.plist");
+    NSDictionary* wantsBlacklistConfig = [NSDictionary dictionaryWithContentsOfFile:configFilePath];
+    if(!wantsBlacklistConfig) return NO;
+
+    return [wantsBlacklistConfig[execName] boolValue];
+}
+
 bool isBlacklistedExec(const char *path, const char *injectPath) {
     const char *exec = strrchr(path, '/');
-    if (!exec) return 1;
+    if (!exec) return true;
+    exec++;
 
-    if (!strcmp(exec + 1, "QQ") || !strcmp(exec + 1, "WeChat") || !strcmp(exec + 1, "Runner")){
-        if (isBlacklisted_orig(path)) return 1;
+    if (isWantsBlacklist([NSString stringWithUTF8String:exec])) {
+        if (isBlacklisted_orig(path)) return true;
     }
 
-    if (wantInject(exec + 1, injectPath))
-        return 0; // 在白名单则注入
+    if (wantInject(exec, injectPath))
+        return false; // 在白名单则注入
 
-    return 1;
+    return true;
 }
 
 bool isWhiteList(const char *path, const char *injectSystemPath);

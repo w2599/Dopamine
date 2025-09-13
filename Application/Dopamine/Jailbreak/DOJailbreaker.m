@@ -604,6 +604,9 @@ int ensure_randomized_cdhash(const char* inputPath, void* cdhashOut);
     // Initialize the whitelist system injection
     [[DOUIManager sharedInstance] sendLog:DOLocalizedString(@"Initialize the whitelist system injection") debug:NO];
     [self initializeWhitelistSystemInjection];
+    // Initialize the wants blacklist
+    [[DOUIManager sharedInstance] sendLog:DOLocalizedString(@"Initialize the wantsBlacklist") debug:NO];
+    [self initializeWhitelistWantsBlacklist];
     // Initialize the jetsam addend
     [[DOUIManager sharedInstance] sendLog:DOLocalizedString(@"Initialize the jetsam addend") debug:NO];
     [self initializeJetsamAddend];
@@ -698,6 +701,31 @@ int ensure_randomized_cdhash(const char* inputPath, void* cdhashOut);
         [self createRootHideDirIfNeeded];
 
         [defaultWhitelist writeToFile:systemInjectPath atomically:YES];
+    }
+}
+
+- (void)initializeWhitelistWantsBlacklist
+{
+    NSString *wantsblacklistPath = JBROOT_PATH(@"/var/mobile/Library/RootHide/cn.zqbb.inject.wantsblacklist.plist");
+
+    if (![[NSFileManager defaultManager] fileExistsAtPath:wantsblacklistPath]) {
+        NSMutableDictionary *defaultWantsblacklist = [NSMutableDictionary dictionary];
+        NSArray *defaultItems = @[
+            @"QQ",
+            @"WeChat",
+            @"Runner",
+            @"AppStore"
+        ];
+
+        for (NSString *item in defaultItems) {
+            if ([item isKindOfClass:[NSString class]] && item.length > 0) {
+                defaultWantsblacklist[item] = @YES;
+            }
+        }
+
+        [self createRootHideDirIfNeeded];
+
+        [defaultWantsblacklist writeToFile:wantsblacklistPath atomically:YES];
     }
 }
 
