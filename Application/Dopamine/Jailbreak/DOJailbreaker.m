@@ -352,24 +352,39 @@ int ensure_randomized_cdhash(const char* inputPath, void* cdhashOut);
     return [NSError errorWithDomain:JBErrorDomain code:JBErrorCodeFailedBasebinTrustcache userInfo:@{NSLocalizedDescriptionKey : @"Failed to load BaseBin trustcache"}];
 }
 
+struct boomerang_info {
+    mach_port_t serverPort;
+    dispatch_semaphore_t boomerangDone;
+};
+
+void *boomerang_server(struct boomerang_info *info)
+{
+    while (true) {
+        xpc_object_t xdict = nil;
+        if (!xpc_pipe_receive(info->serverPort, &xdict)) {
+            if (jbserver_received_boomerang_xpc_message(&gBoomerangServer, xdict) == JBS_BOOMERANG_DONE) {
+                dispatch_semaphore_signal(info->boomerangDone);
+                break;
+            }
+        }
+    }
+    return NULL;
+}
+
 - (NSError *)injectLaunchdHook
 {
+    // Host a boomerang server that will be used by launchdhook to get the jailbreak primitives from this app
     mach_port_t serverPort = MACH_PORT_NULL;
     mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &serverPort);
     mach_port_insert_right(mach_task_self(), serverPort, serverPort, MACH_MSG_TYPE_MAKE_SEND);
-
-    // Host a boomerang server that will be used by launchdhook to get the jailbreak primitives from this app
-    dispatch_semaphore_t boomerangDone = dispatch_semaphore_create(0);
-    dispatch_source_t serverSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_MACH_RECV, (uintptr_t)serverPort, 0, dispatch_get_main_queue());
-    dispatch_source_set_event_handler(serverSource, ^{
-        xpc_object_t xdict = nil;
-        if (!xpc_pipe_receive(serverPort, &xdict)) {
-            if (jbserver_received_boomerang_xpc_message(&gBoomerangServer, xdict) == JBS_BOOMERANG_DONE) {
-                dispatch_semaphore_signal(boomerangDone);
-            }
-        }
-    });
-    dispatch_resume(serverSource);
+    
+    struct boomerang_info info;
+    info.serverPort = serverPort;
+    info.boomerangDone = dispatch_semaphore_create(0);
+    
+    pthread_t boomerangThread;
+    pthread_create(&boomerangThread, NULL, (void *(*)(void *))boomerang_server, &info);
+    pthread_detach(boomerangThread);
 
     // Stash port to server in launchd's initPorts[2]
     // Since we don't have the neccessary entitlements, we need to do it over jbctl
@@ -380,14 +395,12 @@ int ensure_randomized_cdhash(const char* inputPath, void* cdhashOut);
     const char *jbctlPath = JBROOT_PATH("/basebin/jbctl");
     int spawnError = posix_spawn(&spawnedPid, jbctlPath, NULL, &attr, (char *const *)(const char *[]){ jbctlPath, "internal", "launchd_stash_port", NULL }, NULL);
     if (spawnError != 0) {
-        dispatch_cancel(serverSource);
         return [NSError errorWithDomain:JBErrorDomain code:JBErrorCodeFailedLaunchdInjection userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"Spawning jbctl failed with error code %d", spawnError]}];
     }
     posix_spawnattr_destroy(&attr);
     int status = 0;
     do {
         if (waitpid(spawnedPid, &status, 0) == -1) {
-            dispatch_cancel(serverSource);
             return [NSError errorWithDomain:JBErrorDomain code:JBErrorCodeFailedLaunchdInjection userInfo:@{NSLocalizedDescriptionKey : @"Waiting for jbctl failed"}];;
         }
     } while (!WIFEXITED(status) && !WIFSIGNALED(status));
@@ -395,13 +408,11 @@ int ensure_randomized_cdhash(const char* inputPath, void* cdhashOut);
     // Inject launchdhook.dylib into launchd via opainject
     int r = exec_cmd(JBROOT_PATH("/basebin/opainject"), "1", JBROOT_PATH("/basebin/launchdhook.dylib"), NULL);
     if (r != 0) {
-        dispatch_cancel(serverSource);
         return [NSError errorWithDomain:JBErrorDomain code:JBErrorCodeFailedLaunchdInjection userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"opainject failed with error code %d", r]}];
     }
 
     // Wait for everything to finish
-    dispatch_semaphore_wait(boomerangDone, DISPATCH_TIME_FOREVER);
-    dispatch_cancel(serverSource);
+    dispatch_semaphore_wait(info.boomerangDone, DISPATCH_TIME_FOREVER);
     mach_port_deallocate(mach_task_self(), serverPort);
 
     return nil;
