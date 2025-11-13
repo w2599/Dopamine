@@ -33,6 +33,8 @@ int csops(pid_t pid, unsigned int  ops, void * useraddr, size_t usersize);
     @"com.zqbb.Dopamine.roothide", \
     @"com.zqbb.Dopamine-roothide", \
     @"com.zqbb.TrollStore", \
+    @"cn.zqbb.inject.manager", \
+    @"ch.xxtou.XXTExplorer", \
     @"wiki.qaq.TrollFools", \
     @"com.netskao.dumpdecrypter", \
     @"org.coolstar.SileoStore", \
