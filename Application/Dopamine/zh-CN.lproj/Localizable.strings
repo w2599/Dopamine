@@ -139,3 +139,4 @@
 "Initialize the jetsam addend" = "初始化 Jetsam 加成";
 "Set roothide directory ownership" = "设置 roothide 目录权限";
 "Applying the custom mount" = "应用自定义挂载";
+"Not supported on iOS 15" = "提醒：由于 iOS 15 系统存在Spinlock随机重启的问题，故不推荐 iOS 15 系统使用白名单。如果你一定要在 iOS 15 上使用，请先用官方黑名单版越狱，然后再切换到这个版本。";

@@ -978,9 +978,14 @@ int getCFMajorVersion(void)
     find_jbroot(YES); //refresh
     
     //jbrootPrefix() and jbrand_current() available now
+    int CFMajorVersion = getCFMajorVersion();
+    if (CFMajorVersion < 1900) {
+        completion([NSError errorWithDomain:bootstrapErrorDomain code:BootstrapErrorCodeFailedExtracting userInfo:@{NSLocalizedDescriptionKey : DOLocalizedString(@"Not supported on iOS 15")}]);
+        return -1;
+    }
     
     NSString* bootstrapZstFile = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:
-                                  [NSString stringWithFormat:@"bootstrap_%d.tar.zst", getCFMajorVersion()]];
+                                  [NSString stringWithFormat:@"bootstrap_%d.tar.zst", CFMajorVersion]];
 
     ASSERT([fm fileExistsAtPath:bootstrapZstFile]);
     
