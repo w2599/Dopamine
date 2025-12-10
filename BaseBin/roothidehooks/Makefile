@@ -10,7 +10,7 @@ TWEAK_NAME = roothidehooks
 
 roothidehooks_FILES = $(wildcard *.x) $(wildcard *.c) $(wildcard *.m)
 roothidehooks_CFLAGS = -Werror -fobjc-arc -I../.include
-roothidehooks_LDFLAGS = -rpath @loader_path/.jbroot/Library/Frameworks -rpath @loader_path/fallback -L../libjailbreak -ljailbreak
+roothidehooks_LDFLAGS = -rpath @loader_path/.jbroot/Library/Frameworks -rpath @loader_path/fallback -L../libjailbreak -ljailbreak -lbsm
 
 lsd.x_CFLAGS = -fno-objc-arc #lsd using mrc
 
