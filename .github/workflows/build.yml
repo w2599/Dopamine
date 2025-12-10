@@ -8,7 +8,7 @@ env:
 
 jobs:
   build:
-    runs-on: macos-13
+    runs-on: macos-26
     steps:
       - name: Checkout
         uses: actions/checkout@main
@@ -25,6 +25,8 @@ jobs:
           set -x
           git clone https://github.com/CRKatri/trustcache
           cd trustcache
+          export CFLAGS="$CFLAGS -I$(brew --prefix openssl)/include -arch arm64"
+          export LDFLAGS="$LDFLAGS -L$(brew --prefix openssl)/lib -arch arm64"
           gmake -j$(sysctl -n hw.physicalcpu) OPENSSL=1
           sudo cp trustcache /opt/procursus/bin/
 
