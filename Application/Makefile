@@ -24,10 +24,10 @@ build/Build/Products/Debug-iphoneos/Dopamine.app: FORCE
 endif
 	touch build/Build/Products/Debug-iphoneos/Dopamine.app/Dopamine.roothide
 	cp -a Dopamine/Resources/*.deb build/Build/Products/Debug-iphoneos/Dopamine.app/
-# ifeq ($(PALEHIDE), 1)
+ifeq ($(PALEHIDE), 1)
 	make -C Dopamine/Exploits/palera1n package
 	cp -a Dopamine/Exploits/palera1n/.framework build/Build/Products/Debug-iphoneos/Dopamine.app/Frameworks/palera1n.framework
-# endif
+endif
 
 
 clean:
