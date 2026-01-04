@@ -387,18 +387,18 @@
 
         
         if (envManager.isJailbroken) {
-            PSSpecifier *mountSpecifier = [PSSpecifier emptyGroupSpecifier];
-            mountSpecifier.target = self;
+            PSSpecifier *mountSpecifier = [PSSpecifier preferenceSpecifierNamed:@"" target:self set:defSetter get:defGetter detail:nil cell:PSStaticTextCell edit:nil];
             [mountSpecifier setProperty:@"Input_Mmount_Title" forKey:@"title"];
-            [mountSpecifier setProperty:@"DOButtonCell" forKey:@"headerCellClass"];
+            [mountSpecifier setProperty:[DOButtonCell class] forKey:@"cellClass"];
+            [mountSpecifier setProperty:buttonHeight forKey:@"height"];
             [mountSpecifier setProperty:@"doc" forKey:@"image"];
             [mountSpecifier setProperty:@"mountPressed" forKey:@"action"];
             [specifiers addObject:mountSpecifier];
 
-            PSSpecifier *unmountSpecifier = [PSSpecifier emptyGroupSpecifier];
-            unmountSpecifier.target = self;
+            PSSpecifier *unmountSpecifier = [PSSpecifier preferenceSpecifierNamed:@"" target:self set:defSetter get:defGetter detail:nil cell:PSStaticTextCell edit:nil];
             [unmountSpecifier setProperty:@"Input_Unmount_Title" forKey:@"title"];
-            [unmountSpecifier setProperty:@"DOButtonCell" forKey:@"headerCellClass"];
+            [unmountSpecifier setProperty:[DOButtonCell class] forKey:@"cellClass"];
+            [unmountSpecifier setProperty:buttonHeight forKey:@"height"];
             [unmountSpecifier setProperty:@"trash" forKey:@"image"];
             [unmountSpecifier setProperty:@"unmountPressed" forKey:@"action"];
             [specifiers addObject:unmountSpecifier];
@@ -407,13 +407,13 @@
         PSSpecifier *spaceGroupSpecifier = [PSSpecifier emptyGroupSpecifier];
         [specifiers addObject:spaceGroupSpecifier];
         
-	    PSSpecifier *rebootSpecifier = [PSSpecifier emptyGroupSpecifier];
-	    rebootSpecifier.target = self;
-	    [rebootSpecifier setProperty:@"Button_Reboot" forKey:@"title"];
-	    [rebootSpecifier setProperty:@"DOButtonCell" forKey:@"headerCellClass"];
-	    [rebootSpecifier setProperty:@"arrow.triangle.2.circlepath" forKey:@"image"];
-	    [rebootSpecifier setProperty:@"rebootPressed" forKey:@"action"];
-	    [specifiers addObject:rebootSpecifier];
+        PSSpecifier *rebootSpecifier = [PSSpecifier preferenceSpecifierNamed:@"" target:self set:defSetter get:defGetter detail:nil cell:PSStaticTextCell edit:nil];
+        [rebootSpecifier setProperty:@"Button_Reboot" forKey:@"title"];
+        [rebootSpecifier setProperty:[DOButtonCell class] forKey:@"cellClass"];
+        [rebootSpecifier setProperty:buttonHeight forKey:@"height"];
+        [rebootSpecifier setProperty:@"arrow.triangle.2.circlepath" forKey:@"image"];
+        [rebootSpecifier setProperty:@"rebootPressed" forKey:@"action"];
+    	    [specifiers addObject:rebootSpecifier];
         
 
         _specifiers = specifiers;
