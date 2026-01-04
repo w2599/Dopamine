@@ -9,31 +9,31 @@ env:
 
 jobs:
   build:
-    runs-on: macos-13
+    runs-on: macos-latest
     steps:
+      - name: Xcode Setup
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
       - name: Checkout
         uses: actions/checkout@main
         with:
             submodules: recursive
 
-      - name: Pre Procursus
-        uses: w2599/procursus-action@main
+      - name: Install Procursus
+        uses: dhinakg/procursus-action@main
         with:
-          packages: ldid findutils coreutils make sed
+          packages: ldid findutils sed coreutils make
 
-      - name: Pre trustcache
+      - name: Install better GNU Make
         run: |
-          # set -x
-          git clone https://github.com/CRKatri/trustcache
-          cd trustcache
-          # export CFLAGS="$CFLAGS -I$(brew --prefix openssl)/include -arch arm64"
-          # export LDFLAGS="$LDFLAGS -L$(brew --prefix openssl)/lib -arch arm64"
-          gmake -j$(sysctl -n hw.physicalcpu) OPENSSL=1
-          sudo cp trustcache /opt/procursus/bin/
+          brew install make
+          echo "PATH=$(brew --prefix make)/libexec/gnubin:$PATH" >> $GITHUB_ENV
 
-      - name: Pre theos
+      - name: Install THEOS
         run: |
-          # set -x
+          set -x
           export BASEDIR="$(pwd)"
           export THEOS="${BASEDIR}/theos"
           mkdir -p $THEOS
@@ -46,6 +46,20 @@ jobs:
           rm $THEOS/sdks/iPhoneOS16.5.sdk.tar
           cd $BASEDIR
 
+      - name: Build and Install trustcache
+        run: |
+          set -x
+          git clone https://github.com/CRKatri/trustcache
+          cd trustcache
+          export CFLAGS="$CFLAGS -I$(brew --prefix openssl)/include -arch arm64"
+          export LDFLAGS="$LDFLAGS -L$(brew --prefix openssl)/lib -arch arm64"
+          gmake -j$(sysctl -n hw.logicalcpu) OPENSSL=1
+          sudo cp trustcache /opt/procursus/bin/
+
+      - name: Install libarchive
+        run: |
+          brew install libarchive
+      
       - name: Pre Bundleid
         run: |
           sed -i '' "s/com.opa334.Dopamine/${{ env.BUNDLEID }}/g" ./Application/Dopamine/Jailbreak/DOPreferenceManager.m
@@ -125,6 +139,14 @@ jobs:
           # cp Dopamine/Dopamine.tipa Dopamine.tipa
           mv Application/Dopamine.tipa Dopamine_blacklist_${{ env.newVERSION }}_${{ env.commitCount }}_${{ env.msT }}_${{ env.SHASH }}.tipa
 
+      - name: Upload Latest Artifact
+        id: dopamine-latest-upload
+        uses: actions/upload-artifact@main
+        with:
+          name: Dopamine_Latest
+          path: |
+            *.tipa
+
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
@@ -135,11 +157,3 @@ jobs:
           token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
           files: |
            *.tipa
-
-      - name: Upload Latest Artifact
-        id: dopamine-latest-upload
-        uses: actions/upload-artifact@main
-        with:
-          name: Dopamine_Latest
-          path: |
-            *.tipa
