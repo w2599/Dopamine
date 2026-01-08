@@ -619,6 +619,13 @@
         chosenImage = info[UIImagePickerControllerOriginalImage];
     }
 
+    // Force correct the orientation
+    // For some reason without rerendering the image, the stored file will have a wrong orientation for photos taken with the camera‚
+    UIGraphicsBeginImageContextWithOptions(chosenImage.size, NO, 1.0);
+    [chosenImage drawInRect:CGRectMake(0,0, chosenImage.size.width, chosenImage.size.height)];
+    chosenImage = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+
     [UIImagePNGRepresentation(chosenImage) writeToFile:[DOUIManager sharedInstance].bootlogoPath atomically:YES];
 
     if ([DOEnvironmentManager sharedManager].isJailbroken) {
