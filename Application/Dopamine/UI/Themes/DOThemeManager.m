@@ -10,7 +10,7 @@
 
 @implementation DOThemeManager
 
-+ (id)sharedInstance
++ (instancetype)sharedInstance
 {
     static DOThemeManager *sharedManager = nil;
     static dispatch_once_t onceToken;

@@ -716,8 +716,7 @@ int reboot3(uint64_t flags, ...);
         UIImage *bootLogoImage;
 
         if ([[DOPreferenceManager sharedManager] boolPreferenceValueForKey:@"customBootlogoEnabled" fallback:NO]) {
-            NSString *customBootlogoPath = [NSHomeDirectory() stringByAppendingPathComponent:@"Documents/bootlogo.png"];
-            bootLogoImage = [UIImage imageWithContentsOfFile:customBootlogoPath];
+            bootLogoImage = [UIImage imageWithContentsOfFile:[DOUIManager sharedInstance].bootlogoPath];
         }
 
         if (!bootLogoImage) {

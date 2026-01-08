@@ -619,8 +619,7 @@
         chosenImage = info[UIImagePickerControllerOriginalImage];
     }
 
-    NSString *customBootlogoPath = [NSHomeDirectory() stringByAppendingPathComponent:@"Documents/bootlogo.png"];
-    [UIImagePNGRepresentation(chosenImage) writeToFile:customBootlogoPath atomically:YES];
+    [UIImagePNGRepresentation(chosenImage) writeToFile:[DOUIManager sharedInstance].bootlogoPath atomically:YES];
 
     if ([DOEnvironmentManager sharedManager].isJailbroken) {
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{

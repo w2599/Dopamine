@@ -14,7 +14,7 @@
 
 @implementation DOUIManager
 
-+ (id)sharedInstance
++ (instancetype)sharedInstance
 {
     static DOUIManager *sharedInstance = nil;
     static dispatch_once_t onceToken;
@@ -27,6 +27,7 @@
 - (id)init
 {
     if (self = [super init]){
+        _bootlogoPath = [NSHomeDirectory() stringByAppendingPathComponent:@"Documents/bootlogo.png"];
         _preferenceManager = [DOPreferenceManager sharedManager];
         _logRecord = [NSMutableArray new];
         _logLock = [NSLock new];

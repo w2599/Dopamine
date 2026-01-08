@@ -14,7 +14,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, retain) NSArray<DOTheme*> *themes;
 
-+ (id)sharedInstance;
++ (instancetype)sharedInstance;
 
 + (UIColor*)menuColorWithAlpha:(float)alpha;
 - (NSArray*)getAvailableThemeKeys;
