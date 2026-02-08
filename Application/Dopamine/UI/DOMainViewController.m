@@ -78,6 +78,7 @@
         [DOGlobalAppearance secondarySubtitleString:DOLocalizedString(@"Credits_Made_By") withAlpha:0.8],
         [DOGlobalAppearance secondarySubtitleString:DOLocalizedString(@"AAAA") withAlpha:0.6],
         [DOGlobalAppearance secondarySubtitleString:DOLocalizedString(@"AAAB") withAlpha:0.6],
+        [DOGlobalAppearance secondarySubtitleString:DOLocalizedString(@"AAAC") withAlpha:0.6],
         [DOGlobalAppearance secondarySubtitleString:@" " withAlpha:0.8]
     ]];
     
