@@ -98,8 +98,8 @@ jobs:
       - name: Pre code
         run: |
           sed -i '' "s/AAAA/v${{ env.newVERSION }}  ${{ env.commitCount }}  ${{ env.msT }}/g" ./Application/Dopamine/UI/DOMainViewController.m
-          sed -i '' "s/AAAB/不要为了升级而放弃越狱的乐趣~/g" ./Application/Dopamine/UI/DOMainViewController.m
-          sed -i '' "s/AAAB/不要为了升级而放弃越狱的乐趣~/g" ./Application/Dopamine/UI/DOMainViewController.m
+          sed -i '' "s/AAAB/不要为了升级乐趣~/g" ./Application/Dopamine/UI/DOMainViewController.m
+          sed -i '' "s/AAAB/不要为了升级乐趣~/g" ./Application/Dopamine/UI/DOMainViewController.m
           sed -i '' "s/opa334/w2599/g" ./Application/Dopamine/UI/Settings/DOCreditsViewController.m
           sed -i '' "s/opa334/w2599/g" ./Application/Dopamine/UI/Update/DOUpdateViewController.m
           sed -i '' "s/opa334/w2599/g" ./Application/Dopamine/UI/DOUIManager.m
