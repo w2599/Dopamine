@@ -6,5 +6,6 @@ uint64_t IOSurface_kalloc(uint64_t size, bool leak);
 int IOSurface_kalloc_global(uint64_t *addr, uint64_t size);
 int IOSurface_kalloc_local(uint64_t *addr, uint64_t size);
 void libjailbreak_IOSurface_primitives_init(void);
+void IOSurface_map_cleanup(void);
 
 #endif

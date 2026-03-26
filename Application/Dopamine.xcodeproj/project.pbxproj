@@ -201,6 +201,14 @@
 		8CDD08482B4F6DF100A32B61 /* libxpf.dylib in Embed Libraries */ = {isa = PBXBuildFile; fileRef = 8CDD08442B4F6DD800A32B61 /* libxpf.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		8CDD08492B4F6DF500A32B61 /* libjailbreak.dylib in Embed Libraries */ = {isa = PBXBuildFile; fileRef = 8CDD08422B4F6DD800A32B61 /* libjailbreak.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		8CDD084A2B4F6DF800A32B61 /* libchoma.dylib in Embed Libraries */ = {isa = PBXBuildFile; fileRef = 8CDD08432B4F6DD800A32B61 /* libchoma.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		8CF3E8502F72D45800931CA8 /* IOSurface.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8C5FA9412BDD503D008C246F /* IOSurface.framework */; };
+		8CF3E8512F72D45800931CA8 /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8C5FA93F2BDD5039008C246F /* IOKit.framework */; };
+		8CF3E8522F72D45800931CA8 /* libjailbreak.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 8CDD08422B4F6DD800A32B61 /* libjailbreak.dylib */; platformFilter = ios; };
+		8CF3E8602F72D51500931CA8 /* DarkSword.h in Headers */ = {isa = PBXBuildFile; fileRef = 8CF3E85E2F72D51200931CA8 /* DarkSword.h */; };
+		8CF3E8652F72D57500931CA8 /* DarkSword.h in Headers */ = {isa = PBXBuildFile; fileRef = 8CF3E85E2F72D51200931CA8 /* DarkSword.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		8CF3E8662F72D57800931CA8 /* DarkSword.m in Sources */ = {isa = PBXBuildFile; fileRef = 8CF3E85B2F72D50200931CA8 /* DarkSword.m */; };
+		8CF3E8672F72DD9400931CA8 /* DarkSword.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8CF3E8582F72D45800931CA8 /* DarkSword.framework */; };
+		8CF3E8682F72DD9400931CA8 /* DarkSword.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 8CF3E8582F72D45800931CA8 /* DarkSword.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -239,6 +247,13 @@
 			remoteGlobalIDString = 8CDD07A62B4F619000A32B61;
 			remoteInfo = kfd;
 		};
+		8CF3E8692F72DD9400931CA8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 8C71980D2ABF0E82003C6658 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8CF3E8362F72D45800931CA8;
+			remoteInfo = DarkSword;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -261,6 +276,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
+				8CF3E8682F72DD9400931CA8 /* DarkSword.framework in Embed Frameworks */,
 				8C5FA8DB2BDD36B6008C246F /* weightBufs.framework in Embed Frameworks */,
 				8CDD07AF2B4F619000A32B61 /* kfd.framework in Embed Frameworks */,
 				8C2B1FF42B53492B009BA166 /* dmaFail.framework in Embed Frameworks */,
@@ -539,6 +555,10 @@
 		8CDD08422B4F6DD800A32B61 /* libjailbreak.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libjailbreak.dylib; path = ../BaseBin/.build/libjailbreak.dylib; sourceTree = "<group>"; };
 		8CDD08432B4F6DD800A32B61 /* libchoma.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libchoma.dylib; path = ../BaseBin/.build/libchoma.dylib; sourceTree = "<group>"; };
 		8CDD08442B4F6DD800A32B61 /* libxpf.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libxpf.dylib; path = ../BaseBin/.build/libxpf.dylib; sourceTree = "<group>"; };
+		8CF3E8582F72D45800931CA8 /* DarkSword.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = DarkSword.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		8CF3E8592F72D45900931CA8 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = Info.plist; path = /Users/opa334/Desktop/Research/Projekte/Dopamine/Source/Dopamine/Application/Dopamine/Exploits/DarkSword/Info.plist; sourceTree = "<absolute>"; };
+		8CF3E85B2F72D50200931CA8 /* DarkSword.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DarkSword.m; sourceTree = "<group>"; };
+		8CF3E85E2F72D51200931CA8 /* DarkSword.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DarkSword.h; sourceTree = "<group>"; };
 		C075B0CB2B8F2BCE009A26BB /* th */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = th; path = th.lproj/Localizable.strings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -595,6 +615,7 @@
 				042479E52B66B0DD0082581B /* Preferences.framework in Frameworks */,
 				8C029F662B4E2E970071DE58 /* libcompression.tbd in Frameworks */,
 				8C58E5592B7EAF8000E3ADAA /* CoreServices.framework in Frameworks */,
+				8CF3E8672F72DD9400931CA8 /* DarkSword.framework in Frameworks */,
 				8C4ABEB62B52094100B43C9B /* libjailbreak.dylib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -606,6 +627,16 @@
 				8CDD08362B4F682000A32B61 /* IOSurface.framework in Frameworks */,
 				8CDD08382B4F682500A32B61 /* IOKit.framework in Frameworks */,
 				8C4ABEB92B520E7B00B43C9B /* libjailbreak.dylib in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8CF3E84F2F72D45800931CA8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8CF3E8502F72D45800931CA8 /* IOSurface.framework in Frameworks */,
+				8CF3E8512F72D45800931CA8 /* IOKit.framework in Frameworks */,
+				8CF3E8522F72D45800931CA8 /* libjailbreak.dylib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1038,6 +1069,7 @@
 				8C05B0032B63152B001A7CF3 /* badRecovery.framework */,
 				8C5FA8D42BDD36B6008C246F /* weightBufs.framework */,
 				8C5FA8E42BDD36BF008C246F /* multicast_bytecopy.framework */,
+				8CF3E8582F72D45800931CA8 /* DarkSword.framework */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -1064,6 +1096,7 @@
 		8C7198322ABF130A003C6658 /* Exploits */ = {
 			isa = PBXGroup;
 			children = (
+				8CF3E8352F72D44700931CA8 /* DarkSword */,
 				8C05AFFD2B631443001A7CF3 /* badRecovery */,
 				8CDD07A82B4F619000A32B61 /* kfd */,
 				8C2B1FEE2B5324DE009BA166 /* dmaFail */,
@@ -1142,6 +1175,16 @@
 			path = kfd;
 			sourceTree = "<group>";
 		};
+		8CF3E8352F72D44700931CA8 /* DarkSword */ = {
+			isa = PBXGroup;
+			children = (
+				8CF3E85E2F72D51200931CA8 /* DarkSword.h */,
+				8CF3E85B2F72D50200931CA8 /* DarkSword.m */,
+				8CF3E8592F72D45900931CA8 /* Info.plist */,
+			);
+			path = DarkSword;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXHeadersBuildPhase section */
@@ -1201,6 +1244,7 @@
 			files = (
 				8C5FA8E72BDD36BF008C246F /* multicast_bytecopy.h in Headers */,
 				8C5FA95C2BDD6C0C008C246F /* necp.h in Headers */,
+				8CF3E8602F72D51500931CA8 /* DarkSword.h in Headers */,
 				8C5FA95E2BDD6C0C008C246F /* IOSurfaceRoot.h in Headers */,
 				8C5FA96A2BDD6C0C008C246F /* xpaci.h in Headers */,
 				8C5FA96D2BDD6C0C008C246F /* exploit.h in Headers */,
@@ -1237,6 +1281,14 @@
 				8C21319E2B50CA4B008E682C /* smith.h in Headers */,
 				8C2131912B50CA4B008E682C /* krkw.h in Headers */,
 				8C2131942B50CA4B008E682C /* kread_kqueue_workloop_ctl.h in Headers */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8CF3E8372F72D45800931CA8 /* Headers */ = {
+			isa = PBXHeadersBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8CF3E8652F72D57500931CA8 /* DarkSword.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1337,6 +1389,7 @@
 				8C05B0082B63152B001A7CF3 /* PBXTargetDependency */,
 				8C5FA8D92BDD36B6008C246F /* PBXTargetDependency */,
 				8C5FA8E92BDD36BF008C246F /* PBXTargetDependency */,
+				8CF3E86A2F72DD9400931CA8 /* PBXTargetDependency */,
 			);
 			name = Dopamine;
 			packageProductDependencies = (
@@ -1365,6 +1418,25 @@
 			productReference = 8CDD07A72B4F619000A32B61 /* kfd.framework */;
 			productType = "com.apple.product-type.framework";
 		};
+		8CF3E8362F72D45800931CA8 /* DarkSword */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8CF3E8552F72D45800931CA8 /* Build configuration list for PBXNativeTarget "DarkSword" */;
+			buildPhases = (
+				8CF3E8372F72D45800931CA8 /* Headers */,
+				8CF3E8442F72D45800931CA8 /* Sources */,
+				8CF3E84F2F72D45800931CA8 /* Frameworks */,
+				8CF3E8532F72D45800931CA8 /* Resources */,
+				8CF3E8542F72D45800931CA8 /* ShellScript */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = DarkSword;
+			productName = multicast_bytecopy;
+			productReference = 8CF3E8582F72D45800931CA8 /* DarkSword.framework */;
+			productType = "com.apple.product-type.framework";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -1385,12 +1457,16 @@
 					};
 					8C5FA8E32BDD36BF008C246F = {
 						CreatedOnToolsVersion = 15.3;
+						LastSwiftMigration = 2620;
 					};
 					8C7198142ABF0E82003C6658 = {
 						CreatedOnToolsVersion = 15.0;
 					};
 					8CDD07A62B4F619000A32B61 = {
 						CreatedOnToolsVersion = 15.1;
+					};
+					8CF3E8362F72D45800931CA8 = {
+						LastSwiftMigration = 2620;
 					};
 				};
 			};
@@ -1441,6 +1517,7 @@
 				8C05B0022B63152B001A7CF3 /* badRecovery */,
 				8C5FA8D32BDD36B6008C246F /* weightBufs */,
 				8C5FA8E32BDD36BF008C246F /* multicast_bytecopy */,
+				8CF3E8362F72D45800931CA8 /* DarkSword */,
 			);
 		};
 /* End PBXProject section */
@@ -1517,6 +1594,13 @@
 				8CB94F042B59E17A0098BAFD /* basebin.tc in Resources */,
 				8C7198282ABF0E84003C6658 /* LaunchScreen.storyboard in Resources */,
 				8C7198252ABF0E84003C6658 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8CF3E8532F72D45800931CA8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1598,6 +1682,24 @@
 			shellScript = "install_name_tool -change \"@loader_path/libjailbreak.dylib\" \"@executable_path/libjailbreak.dylib\" \"$BUILT_PRODUCTS_DIR/$EXECUTABLE_PATH\"\n";
 		};
 		8C5FA93E2BDD501C008C246F /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "install_name_tool -change \"@loader_path/libjailbreak.dylib\" \"@executable_path/libjailbreak.dylib\" \"$BUILT_PRODUCTS_DIR/$EXECUTABLE_PATH\"\n";
+		};
+		8CF3E8542F72D45800931CA8 /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -1730,6 +1832,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		8CF3E8442F72D45800931CA8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8CF3E8662F72D57800931CA8 /* DarkSword.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -1757,6 +1867,11 @@
 			isa = PBXTargetDependency;
 			target = 8CDD07A62B4F619000A32B61 /* kfd */;
 			targetProxy = 8CDD07AB2B4F619000A32B61 /* PBXContainerItemProxy */;
+		};
+		8CF3E86A2F72DD9400931CA8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 8CF3E8362F72D45800931CA8 /* DarkSword */;
+			targetProxy = 8CF3E8692F72DD9400931CA8 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -2014,6 +2129,7 @@
 		8C5FA8ED2BDD36BF008C246F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEFINES_MODULE = YES;
@@ -2040,6 +2156,8 @@
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
 				VERSION_INFO_PREFIX = "";
@@ -2049,6 +2167,7 @@
 		8C5FA8EE2BDD36BF008C246F /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEFINES_MODULE = YES;
@@ -2075,6 +2194,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
 				VERSION_INFO_PREFIX = "";
@@ -2240,7 +2360,7 @@
 					"$(PROJECT_DIR)/Dopamine/Dependencies",
 					"$(PROJECT_DIR)/Dopamine/Resources",
 				);
-				MARKETING_VERSION = 2.4.8;
+				MARKETING_VERSION = 2.4.9;
 				PRODUCT_BUNDLE_IDENTIFIER = com.opa334.Dopamine-roothide;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -2277,7 +2397,7 @@
 					"$(PROJECT_DIR)/Dopamine/Dependencies",
 					"$(PROJECT_DIR)/Dopamine/Resources",
 				);
-				MARKETING_VERSION = 2.4.8;
+				MARKETING_VERSION = 2.4.9;
 				PRODUCT_BUNDLE_IDENTIFIER = com.opa334.Dopamine-roothide;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -2353,6 +2473,81 @@
 			};
 			name = Release;
 		};
+		8CF3E8562F72D45800931CA8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DEVELOPMENT_TEAM = 3Z56NQJ65R;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "$(SRCROOT)/Dopamine/Exploits/DarkSword/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = DarkSword;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				MODULE_VERIFIER_SUPPORTED_LANGUAGES = "objective-c objective-c++";
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
+				PRODUCT_BUNDLE_IDENTIFIER = com.opa334.DarkSword;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+			};
+			name = Debug;
+		};
+		8CF3E8572F72D45800931CA8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DEVELOPMENT_TEAM = 3Z56NQJ65R;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "$(SRCROOT)/Dopamine/Exploits/DarkSword/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = DarkSword;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				MODULE_VERIFIER_SUPPORTED_LANGUAGES = "objective-c objective-c++";
+				MODULE_VERIFIER_SUPPORTED_LANGUAGE_STANDARDS = "gnu17 gnu++20";
+				PRODUCT_BUNDLE_IDENTIFIER = com.opa334.DarkSword;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+				VERSION_INFO_PREFIX = "";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -2415,6 +2610,15 @@
 			buildConfigurations = (
 				8CDD07B02B4F619000A32B61 /* Debug */,
 				8CDD07B12B4F619000A32B61 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8CF3E8552F72D45800931CA8 /* Build configuration list for PBXNativeTarget "DarkSword" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8CF3E8562F72D45800931CA8 /* Debug */,
+				8CF3E8572F72D45800931CA8 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

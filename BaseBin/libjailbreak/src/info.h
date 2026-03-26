@@ -238,6 +238,22 @@ struct system_info {
 
 			uint32_t struct_size;
 		} trustcache;
+
+		struct {
+			uint32_t list_next;
+			uint32_t list_prev;
+			uint32_t socket;
+			uint32_t icmp6filt;
+		} inpcb;
+
+		struct {
+			uint32_t usecount;
+			uint32_t proto;
+		} socket;
+
+		struct {
+			uint32_t input;
+		} protosw;
 	} kernelStruct;
 };
 
@@ -426,7 +442,18 @@ extern struct system_info gSystemInfo;
 	iterator(ctx, kernelStruct.trustcache.prevptr); \
 	iterator(ctx, kernelStruct.trustcache.size); \
 	iterator(ctx, kernelStruct.trustcache.fileptr); \
-	iterator(ctx, kernelStruct.trustcache.struct_size);
+	iterator(ctx, kernelStruct.trustcache.struct_size); \
+	\
+	iterator(ctx, kernelStruct.inpcb.list_next); \
+	iterator(ctx, kernelStruct.inpcb.list_prev); \
+	iterator(ctx, kernelStruct.inpcb.socket); \
+	iterator(ctx, kernelStruct.inpcb.icmp6filt); \
+	\
+	iterator(ctx, kernelStruct.socket.usecount); \
+	iterator(ctx, kernelStruct.socket.proto); \
+	\
+	iterator(ctx, kernelStruct.protosw.input);
+
 
 #define SYSTEM_INFO_ITERATE(ctx, iterator) \
 	KERNEL_CONSTANTS_ITERATE(ctx, iterator); \

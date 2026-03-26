@@ -158,7 +158,20 @@ void jbinfo_initialize_hardcoded_offsets(void)
 		// trustcache
 		gSystemInfo.kernelStruct.trustcache.nextptr        =  0x0;
 		gSystemInfo.kernelStruct.trustcache.fileptr        =  0x8;
-		gSystemInfo.kernelStruct.trustcache.struct_size = 0x10;
+		gSystemInfo.kernelStruct.trustcache.struct_size    = 0x10;
+
+		// inpcb
+		gSystemInfo.kernelStruct.inpcb.list_next = 0x20;
+		gSystemInfo.kernelStruct.inpcb.list_prev = 0x28;
+		gSystemInfo.kernelStruct.inpcb.socket    = 0x40;
+		gSystemInfo.kernelStruct.inpcb.icmp6filt = (0x138 + 0x18);
+
+		// socket
+		gSystemInfo.kernelStruct.socket.proto    = 0x18;
+		gSystemInfo.kernelStruct.socket.usecount = 0x228;
+
+		// proto
+		gSystemInfo.kernelStruct.protosw.input = 0x28;
 
 		if (strcmp(darwinVersion, "21.2.0") >= 0) { // iOS 15.2+
 			// proc
@@ -206,9 +219,13 @@ void jbinfo_initialize_hardcoded_offsets(void)
 					gSystemInfo.kernelStruct.proc.flag    = 0x25C;
 					gSystemInfo.kernelStruct.proc.textvp  = 0x350;
 
+					// proc_ro
 					gSystemInfo.kernelStruct.proc_ro.syscall_filter_mask = 0x28;
 					gSystemInfo.kernelStruct.proc_ro.mach_trap_filter_mask = 0x68;
 					gSystemInfo.kernelStruct.proc_ro.mach_kobj_filter_mask = 0x70;
+
+					// socket
+					gSystemInfo.kernelStruct.socket.usecount = 0x22c;
 
 					// task
 #ifdef __arm64e__
