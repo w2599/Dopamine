@@ -219,6 +219,7 @@ sets[idx] = NULL;
 {
     int r = [[DOExploitManager sharedManager] cleanUpExploits];
     if (r != 0) return [NSError errorWithDomain:JBErrorDomain code:JBErrorCodeFailedCleanup userInfo:@{NSLocalizedDescriptionKey:[NSString stringWithFormat:@"Failed to cleanup exploits: %d", r]}];
+    IOSurface_map_cleanup();
     return nil;
 }
 
