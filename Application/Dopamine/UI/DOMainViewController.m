@@ -29,7 +29,7 @@
 
 // 新增背景视图属性
 @property (nonatomic, strong) UIImageView *backgroundImageView;
-// 将 actionView 设为属性，方便随时控制
+// 将 actionView 设为属性，方便控制透明度
 @property (nonatomic, strong) DOActionMenuView *actionView;
 
 @end
@@ -48,7 +48,7 @@
     // 3. 初始化长按手势
     [self setupGesture];
     
-    // 4. 初次加载时刷新 UI 透明度
+    // 4. 初次加载应用时刷新一次透明度
     [self updateUITransparency];
 }
 
@@ -88,41 +88,41 @@
     [self updateUITransparency];
 }
 
-// 核心功能：根据背景图是否存在，动态调整按钮透明度
+// 核心功能：实现中间和底部按钮的同步透明逻辑
 - (void)updateUITransparency {
     BOOL hasCustomBG = (self.backgroundImageView.image != nil);
     
-    [UIView animateWithDuration:0.5 animations:^{
-        // 1. 处理中间的 ActionMenu 容器
+    [UIView animateWithDuration:0.4 options:UIViewAnimationOptionCurveEaseInOut animations:^{
+        // 1. 处理中间菜单 (DOActionMenuView)
         if (self.actionView) {
-            // 如果有背景图，让菜单容器变透明，文字悬浮
+            // 有背景图时去掉容器背景，没背景图时恢复原生 0.05 的极浅白色背景（防止看不清文字）
             self.actionView.backgroundColor = hasCustomBG ? [UIColor clearColor] : [UIColor colorWithWhite:1.0 alpha:0.05];
             
-            // 递归查找菜单内部可能的背景模糊层（MaterialView）并隐藏
             for (UIView *subview in self.actionView.subviews) {
+                // 递归查找并关闭毛玻璃层 (MTMaterialView)
                 if ([NSStringFromClass([subview class]) containsString:@"Material"]) {
                     subview.alpha = hasCustomBG ? 0.0 : 1.0;
                 }
             }
         }
         
-        // 2. 处理下方的已越狱/越狱按钮
+        // 2. 处理底部按钮 (DOJailbreakButton)
         if (self.jailbreakBtn) {
-            // 同样处理底部大按钮的透明度
             for (UIView *subview in self.jailbreakBtn.subviews) {
+                // 同步处理底部按钮的毛玻璃层
                 if ([NSStringFromClass([subview class]) containsString:@"Material"]) {
-                    subview.alpha = hasCustomBG ? 0.3 : 1.0; // 留一点点底色，避免完全看不清按钮范围
+                    subview.alpha = hasCustomBG ? 0.0 : 1.0;
                 }
             }
         }
-    }];
+    } completion:nil];
 }
 
 - (void)handleLongPress:(UILongPressGestureRecognizer *)gesture {
     if (gesture.state == UIGestureRecognizerStateBegan) {
-        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"首页视觉设置" message:nil preferredStyle:UIAlertControllerStyleActionSheet];
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"首页视觉自定义" message:nil preferredStyle:UIAlertControllerStyleActionSheet];
         
-        [alert addAction:[UIAlertAction actionWithTitle:@"从相册选择背景" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+        [alert addAction:[UIAlertAction actionWithTitle:@"更换背景 (自动同步透明)" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
             UIImagePickerController *picker = [[UIImagePickerController alloc] init];
             picker.delegate = self;
             picker.sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
@@ -131,7 +131,7 @@
         }]];
         
         if (self.backgroundImageView.image != nil) {
-            [alert addAction:[UIAlertAction actionWithTitle:@"还原默认背景 (恢复按钮框)" style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {
+            [alert addAction:[UIAlertAction actionWithTitle:@"还原默认 (恢复按钮背板)" style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {
                 if ([[NSFileManager defaultManager] fileExistsAtPath:CUSTOM_BG_IMAGE_PATH]) {
                     [[NSFileManager defaultManager] removeItemAtPath:CUSTOM_BG_IMAGE_PATH error:nil];
                 }
@@ -200,7 +200,7 @@
         ]];
     }
 
-    // Header
+    // Header - 保持你要求的 5 行结构
     DOHeaderView *headerView = [[DOHeaderView alloc] initWithImage: [UIImage imageNamed:@"Dopamine"] subtitles: @[
         [DOGlobalAppearance mainSubtitleString:[[DOEnvironmentManager sharedManager] versionSupportString]],
         [DOGlobalAppearance secondarySubtitleString:DOLocalizedString(@"Credits_Made_By") withAlpha:0.8],
@@ -216,7 +216,7 @@
         [headerView.trailingAnchor constraintEqualToAnchor:stackView.trailingAnchor]
     ]];
     
-    // Action Menu - 整合到 self.actionView 属性
+    // Action Menu
     self.actionView = [[DOActionMenuView alloc] initWithActions:@[
         [UIAction actionWithTitle:DOLocalizedString(@"Menu_Settings_Title") image:[UIImage systemImageNamed:@"gearshape" withConfiguration:[DOGlobalAppearance smallIconImageConfiguration]] identifier:@"settings" handler:^(__kindof UIAction * _Nonnull action) {
             [self.navigationController pushViewController:[[DOSettingsController alloc] init] animated:YES];
@@ -254,17 +254,13 @@
     BOOL isJailbroken = [[DOEnvironmentManager sharedManager] isJailbroken];
     BOOL isSupported = [[DOEnvironmentManager sharedManager] isSupported];
     NSString *jailbreakButtonTitle = [self jailbreakButtonTitle];
-    UIImage *jailbreakButtonImage;
-    if (isSupported)
-        jailbreakButtonImage = [UIImage systemImageNamed:@"lock.open" withConfiguration:[DOGlobalAppearance smallIconImageConfiguration]];
-    else
-        jailbreakButtonImage = [UIImage systemImageNamed:@"lock.slash" withConfiguration:[DOGlobalAppearance smallIconImageConfiguration]];
+    UIImage *jailbreakButtonImage = isSupported ? [UIImage systemImageNamed:@"lock.open" withConfiguration:[DOGlobalAppearance smallIconImageConfiguration]] : [UIImage systemImageNamed:@"lock.slash" withConfiguration:[DOGlobalAppearance smallIconImageConfiguration]];
     
     self.jailbreakBtn = [[DOJailbreakButton alloc] initWithAction: [UIAction actionWithTitle:jailbreakButtonTitle image:jailbreakButtonImage identifier:@"jailbreak" handler:^(__kindof UIAction * _Nonnull action) {
 
         if(otherJailbreakActived(false)) {
             UIAlertController *alertController = [UIAlertController alertControllerWithTitle:DOLocalizedString(@"Error") message:DOLocalizedString(@"Your device currently has another jailbreak activated, please reboot device.") preferredStyle:UIAlertControllerStyleAlert];
-            UIAlertAction *rebootAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Close") style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) { }];
+            UIAlertAction *rebootAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Close") style:UIAlertActionStyleDefault handler:nil];
             [alertController addAction:rebootAction];
             [self presentViewController:alertController animated:YES completion:nil];
             return;
@@ -273,10 +269,10 @@
         [self.actionView hide];
         [self.jailbreakBtn expandButton: self.jailbreakButtonConstraints];
         self.updateButton.userInteractionEnabled = NO;
-        [UIView animateWithDuration:0.75 delay:0 usingSpringWithDamping:0.9 initialSpringVelocity:2.0  options: UIViewAnimationOptionCurveEaseInOut animations:^{
+        [UIView animateWithDuration:0.75 animations:^{
             [headerView setTransform:CGAffineTransformMakeTranslation(0, -25)];
             self.updateButton.alpha = 0;
-        } completion:nil];
+        }];
         [self startJailbreak];
     }]];
     self.jailbreakBtn.enabled = !isJailbroken && isSupported;
@@ -291,13 +287,9 @@
     ])];
 
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 0.1 * NSEC_PER_SEC), dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0), ^{
-        if ([[DOUIManager sharedInstance] environmentUpdateAvailable])
+        if ([[DOUIManager sharedInstance] environmentUpdateAvailable] || [[DOUIManager sharedInstance] isUpdateAvailable])
         {
-            dispatch_async(dispatch_get_main_queue(), ^{ [self setupUpdateAvailable:YES]; });
-        }
-        else if ([[DOUIManager sharedInstance] isUpdateAvailable])
-        {
-            dispatch_async(dispatch_get_main_queue(), ^{ [self setupUpdateAvailable:NO]; });
+            dispatch_async(dispatch_get_main_queue(), ^{ [self setupUpdateAvailable:[[DOUIManager sharedInstance] environmentUpdateAvailable]]; });
         }
     });
 }
@@ -374,7 +366,7 @@
     ]];
     [self.updateButton setTransform:CGAffineTransformMakeTranslation(0, 25)];
     [self.updateButton setAlpha:0];
-    [UIView animateWithDuration:0.5 delay:0 usingSpringWithDamping:0.9 initialSpringVelocity:2.0  options: UIViewAnimationOptionCurveEaseInOut animations:^{
+    [UIView animateWithDuration:0.5 delay:0 usingSpringWithDamping:0.9 initialSpringVelocity:2.0 animations:^{
         [self.updateButton setTransform:CGAffineTransformIdentity];
         [self.updateButton setAlpha:1];
     } completion:nil];
@@ -388,7 +380,7 @@
     mainView.layer.cornerCurve = kCACornerCurveContinuous;
     mainView.layer.masksToBounds = YES;
     self.hideStatusBar = YES;
-    [UIView animateWithDuration:0.5 delay:0 usingSpringWithDamping:0.9 initialSpringVelocity:2.0 options: UIViewAnimationOptionCurveEaseInOut animations:^{
+    [UIView animateWithDuration:0.5 delay:0 usingSpringWithDamping:0.9 initialSpringVelocity:2.0 animations:^{
         mainView.transform = CGAffineTransformMakeScale(0.9, 0.9);
         mainView.alpha = 0.0;
     } completion:^(BOOL success) { completion(); }];
