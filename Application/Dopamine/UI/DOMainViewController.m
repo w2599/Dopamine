@@ -2,43 +2,43 @@
 //  DOMainViewController.m
 //  Dopamine
 //
-//  Created by tomt000 on 08/01/2024.
-//
+//  创建于 由  于 2024年/01月/08日。
+输入：//
 
-#import "DOMainViewController.h"
-#import "DOUIManager.h"
-#import "DOEnvironmentManager.h"
-#import "DOJailbreaker.h"
-#import "DOGlobalAppearance.h"
-#import "DOActionMenuButton.h"
-#import "DOUpdateViewController.h"
-#import "DOLogCrashViewController.h"
-#import <pthread.h>
-#import <libjailbreak/libjailbreak.h>
+#导入 "DOMainViewController.h"
+#导入 "DOUIManager.h"
+#导入 "DOEnvironmentManager.h"
+#导入 "DOJailbreaker.h"
+#导入 "DOGlobalAppearance.h"
+#导入 "DOActionMenuButton.h"
+#导入 "DOUpdateViewController.h"
+#导入 "DOLogCrashViewController.h"
+#导入 <线程.头文件>
+#导入 <libjailbreaklibjailbreakh
 
-@interface DOMainViewController ()
+@接口  ()
 
-@property DOJailbreakButton *jailbreakBtn;
-@property NSArray<NSLayoutConstraint *> *jailbreakButtonConstraints;
-@property DOActionMenuButton *updateButton;
-@property(nonatomic) BOOL hideStatusBar;
-@property(nonatomic) BOOL hideHomeIndicator;
+@属性 DOJailbreakButton *越狱按钮;
+@属性 NSArray<NSLayoutConstraint *> *jailbreakButtonConstraints;
+@属性 DOActionMenuButton *更新按钮;
+@属性(nonatomic) BOOL hideStatusBar;
+@属性(nonatomic) BOOL hideHomeIndicator;
 
-@end
+@结束
 
-@implementation DOMainViewController
+@实现 DOMainViewController
 
-- (void)viewDidLoad {
-    [super viewDidLoad];
-    [self setupStack];
+- ()viewDidLoad {
+    [超级 视图加载];
+    [自我 设置堆栈];
 }
 
--(void)setupStack
+-(无)初始化堆栈
 {
     UIStackView *stackView = [[UIStackView alloc] init];
-    [stackView setAxis:UILayoutConstraintAxisVertical];
-    [stackView setAlignment:UIStackViewAlignmentTrailing];
-    [stackView setDistribution:UIStackViewDistributionEqualSpacing];
+    [stackView 设置轴:UILayoutConstraintAxisVertical;
+    [stackView 设置对齐方式:UICollectionViewCellAlignmentTrailing];
+    [stackView 设置分布:UICollectionViewLayoutDistributionEqual Spacing;
     [stackView setTranslatesAutoresizingMaskIntoConstraints:NO];
 
     [self.view addSubview:stackView];
@@ -78,7 +78,6 @@
         [DOGlobalAppearance secondarySubtitleString:DOLocalizedString(@"Credits_Made_By") withAlpha:0.8],
         [DOGlobalAppearance secondarySubtitleString:DOLocalizedString(@"AAAA") withAlpha:0.6],
         [DOGlobalAppearance secondarySubtitleString:DOLocalizedString(@"AAAB") withAlpha:0.6],
-        [DOGlobalAppearance secondarySubtitleString:DOLocalizedString(@"AAAC") withAlpha:0.6],
         [DOGlobalAppearance secondarySubtitleString:@" " withAlpha:0.8]
     ]];
     
