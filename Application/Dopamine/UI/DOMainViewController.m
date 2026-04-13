@@ -16,7 +16,7 @@
 #import <pthread.h>
 #import <libjailbreak/libjailbreak.h>
 
-// 背景图片保存路径宏定义
+// 背景图片保存路径
 #define CUSTOM_BG_IMAGE_PATH [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject stringByAppendingPathComponent:@"custom_background.jpg"]
 
 @interface DOMainViewController () <UIImagePickerControllerDelegate, UINavigationControllerDelegate>
@@ -29,6 +29,8 @@
 
 // 新增背景视图属性
 @property (nonatomic, strong) UIImageView *backgroundImageView;
+// 将 actionView 设为属性，方便随时控制
+@property (nonatomic, strong) DOActionMenuView *actionView;
 
 @end
 
@@ -45,9 +47,12 @@
     
     // 3. 初始化长按手势
     [self setupGesture];
+    
+    // 4. 初次加载时刷新 UI 透明度
+    [self updateUITransparency];
 }
 
-#pragma mark - 背景与手势逻辑
+#pragma mark - 背景与智能 UI 逻辑
 
 - (void)setupBackground {
     self.backgroundImageView = [[UIImageView alloc] init];
@@ -56,7 +61,7 @@
     self.backgroundImageView.clipsToBounds = YES;
     
     [self.view addSubview:self.backgroundImageView];
-    [self.view sendSubviewToBack:self.backgroundImageView]; // 确保背景在所有按钮下方
+    [self.view sendSubviewToBack:self.backgroundImageView];
     
     [NSLayoutConstraint activateConstraints:@[
         [self.backgroundImageView.topAnchor constraintEqualToAnchor:self.view.topAnchor],
@@ -70,7 +75,7 @@
 
 - (void)setupGesture {
     UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPress:)];
-    longPress.minimumPressDuration = 0.5; // 长按0.5秒触发
+    longPress.minimumPressDuration = 0.5;
     [self.view addGestureRecognizer:longPress];
 }
 
@@ -80,13 +85,44 @@
     } else {
         self.backgroundImageView.image = nil;
     }
+    [self updateUITransparency];
+}
+
+// 核心功能：根据背景图是否存在，动态调整按钮透明度
+- (void)updateUITransparency {
+    BOOL hasCustomBG = (self.backgroundImageView.image != nil);
+    
+    [UIView animateWithDuration:0.5 animations:^{
+        // 1. 处理中间的 ActionMenu 容器
+        if (self.actionView) {
+            // 如果有背景图，让菜单容器变透明，文字悬浮
+            self.actionView.backgroundColor = hasCustomBG ? [UIColor clearColor] : [UIColor colorWithWhite:1.0 alpha:0.05];
+            
+            // 递归查找菜单内部可能的背景模糊层（MaterialView）并隐藏
+            for (UIView *subview in self.actionView.subviews) {
+                if ([NSStringFromClass([subview class]) containsString:@"Material"]) {
+                    subview.alpha = hasCustomBG ? 0.0 : 1.0;
+                }
+            }
+        }
+        
+        // 2. 处理下方的已越狱/越狱按钮
+        if (self.jailbreakBtn) {
+            // 同样处理底部大按钮的透明度
+            for (UIView *subview in self.jailbreakBtn.subviews) {
+                if ([NSStringFromClass([subview class]) containsString:@"Material"]) {
+                    subview.alpha = hasCustomBG ? 0.3 : 1.0; // 留一点点底色，避免完全看不清按钮范围
+                }
+            }
+        }
+    }];
 }
 
 - (void)handleLongPress:(UILongPressGestureRecognizer *)gesture {
     if (gesture.state == UIGestureRecognizerStateBegan) {
-        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"更换首页背景" message:nil preferredStyle:UIAlertControllerStyleActionSheet];
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"首页视觉设置" message:nil preferredStyle:UIAlertControllerStyleActionSheet];
         
-        [alert addAction:[UIAlertAction actionWithTitle:@"从相册选择" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+        [alert addAction:[UIAlertAction actionWithTitle:@"从相册选择背景" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
             UIImagePickerController *picker = [[UIImagePickerController alloc] init];
             picker.delegate = self;
             picker.sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
@@ -95,7 +131,7 @@
         }]];
         
         if (self.backgroundImageView.image != nil) {
-            [alert addAction:[UIAlertAction actionWithTitle:@"恢复默认" style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {
+            [alert addAction:[UIAlertAction actionWithTitle:@"还原默认背景 (恢复按钮框)" style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {
                 if ([[NSFileManager defaultManager] fileExistsAtPath:CUSTOM_BG_IMAGE_PATH]) {
                     [[NSFileManager defaultManager] removeItemAtPath:CUSTOM_BG_IMAGE_PATH error:nil];
                 }
@@ -164,7 +200,7 @@
         ]];
     }
 
-    // Header - 保持你要求的 5 行 Subtitles 结构
+    // Header
     DOHeaderView *headerView = [[DOHeaderView alloc] initWithImage: [UIImage imageNamed:@"Dopamine"] subtitles: @[
         [DOGlobalAppearance mainSubtitleString:[[DOEnvironmentManager sharedManager] versionSupportString]],
         [DOGlobalAppearance secondarySubtitleString:DOLocalizedString(@"Credits_Made_By") withAlpha:0.8],
@@ -180,8 +216,8 @@
         [headerView.trailingAnchor constraintEqualToAnchor:stackView.trailingAnchor]
     ]];
     
-    // Action Menu
-    DOActionMenuView *actionView = [[DOActionMenuView alloc] initWithActions:@[
+    // Action Menu - 整合到 self.actionView 属性
+    self.actionView = [[DOActionMenuView alloc] initWithActions:@[
         [UIAction actionWithTitle:DOLocalizedString(@"Menu_Settings_Title") image:[UIImage systemImageNamed:@"gearshape" withConfiguration:[DOGlobalAppearance smallIconImageConfiguration]] identifier:@"settings" handler:^(__kindof UIAction * _Nonnull action) {
             [self.navigationController pushViewController:[[DOSettingsController alloc] init] animated:YES];
         }],
@@ -200,11 +236,11 @@
         }]
     ] delegate:self];
     
-    [stackView addArrangedSubview: actionView];
+    [stackView addArrangedSubview: self.actionView];
 
     [NSLayoutConstraint activateConstraints:@[
-        [actionView.leadingAnchor constraintEqualToAnchor:stackView.leadingAnchor],
-        [actionView.trailingAnchor constraintEqualToAnchor:stackView.trailingAnchor],
+        [self.actionView.leadingAnchor constraintEqualToAnchor:stackView.leadingAnchor],
+        [self.actionView.trailingAnchor constraintEqualToAnchor:stackView.trailingAnchor],
     ]];
     
     UIView *buttonPlaceHolder = [[UIView alloc] init];
@@ -234,7 +270,7 @@
             return;
         }
 
-        [actionView hide];
+        [self.actionView hide];
         [self.jailbreakBtn expandButton: self.jailbreakButtonConstraints];
         self.updateButton.userInteractionEnabled = NO;
         [UIView animateWithDuration:0.75 delay:0 usingSpringWithDamping:0.9 initialSpringVelocity:2.0  options: UIViewAnimationOptionCurveEaseInOut animations:^{
