@@ -16,7 +16,10 @@
 #import <pthread.h>
 #import <libjailbreak/libjailbreak.h>
 
-@interface DOMainViewController ()
+// 背景图片保存路径宏定义
+#define CUSTOM_BG_IMAGE_PATH [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject stringByAppendingPathComponent:@"custom_background.jpg"]
+
+@interface DOMainViewController () <UIImagePickerControllerDelegate, UINavigationControllerDelegate>
 
 @property DOJailbreakButton *jailbreakBtn;
 @property NSArray<NSLayoutConstraint *> *jailbreakButtonConstraints;
@@ -24,14 +27,104 @@
 @property(nonatomic) BOOL hideStatusBar;
 @property(nonatomic) BOOL hideHomeIndicator;
 
+// 新增背景视图属性
+@property (nonatomic, strong) UIImageView *backgroundImageView;
+
 @end
 
 @implementation DOMainViewController
 
 - (void)viewDidLoad {
     [super viewDidLoad];
+    
+    // 1. 初始化背景层
+    [self setupBackground];
+    
+    // 2. 初始化UI布局
     [self setupStack];
+    
+    // 3. 初始化长按手势
+    [self setupGesture];
 }
+
+#pragma mark - 背景与手势逻辑
+
+- (void)setupBackground {
+    self.backgroundImageView = [[UIImageView alloc] init];
+    self.backgroundImageView.translatesAutoresizingMaskIntoConstraints = NO;
+    self.backgroundImageView.contentMode = UIViewContentModeScaleAspectFill;
+    self.backgroundImageView.clipsToBounds = YES;
+    
+    [self.view addSubview:self.backgroundImageView];
+    [self.view sendSubviewToBack:self.backgroundImageView]; // 确保背景在所有按钮下方
+    
+    [NSLayoutConstraint activateConstraints:@[
+        [self.backgroundImageView.topAnchor constraintEqualToAnchor:self.view.topAnchor],
+        [self.backgroundImageView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
+        [self.backgroundImageView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [self.backgroundImageView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor]
+    ]];
+    
+    [self loadSavedBackground];
+}
+
+- (void)setupGesture {
+    UILongPressGestureRecognizer *longPress = [[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPress:)];
+    longPress.minimumPressDuration = 0.5; // 长按0.5秒触发
+    [self.view addGestureRecognizer:longPress];
+}
+
+- (void)loadSavedBackground {
+    if ([[NSFileManager defaultManager] fileExistsAtPath:CUSTOM_BG_IMAGE_PATH]) {
+        self.backgroundImageView.image = [UIImage imageWithContentsOfFile:CUSTOM_BG_IMAGE_PATH];
+    } else {
+        self.backgroundImageView.image = nil;
+    }
+}
+
+- (void)handleLongPress:(UILongPressGestureRecognizer *)gesture {
+    if (gesture.state == UIGestureRecognizerStateBegan) {
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"更换首页背景" message:nil preferredStyle:UIAlertControllerStyleActionSheet];
+        
+        [alert addAction:[UIAlertAction actionWithTitle:@"从相册选择" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+            UIImagePickerController *picker = [[UIImagePickerController alloc] init];
+            picker.delegate = self;
+            picker.sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
+            picker.modalPresentationStyle = UIModalPresentationFullScreen;
+            [self presentViewController:picker animated:YES completion:nil];
+        }]];
+        
+        if (self.backgroundImageView.image != nil) {
+            [alert addAction:[UIAlertAction actionWithTitle:@"恢复默认" style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {
+                if ([[NSFileManager defaultManager] fileExistsAtPath:CUSTOM_BG_IMAGE_PATH]) {
+                    [[NSFileManager defaultManager] removeItemAtPath:CUSTOM_BG_IMAGE_PATH error:nil];
+                }
+                [self loadSavedBackground];
+            }]];
+        }
+        
+        [alert addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil];
+    }
+}
+
+#pragma mark - 图片选择回调
+
+- (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary<UIImagePickerControllerInfoKey,id> *)info {
+    [picker dismissViewControllerAnimated:YES completion:nil];
+    UIImage *image = info[UIImagePickerControllerOriginalImage];
+    if (image) {
+        NSData *imageData = UIImageJPEGRepresentation(image, 0.8);
+        [imageData writeToFile:CUSTOM_BG_IMAGE_PATH atomically:YES];
+        [self loadSavedBackground];
+    }
+}
+
+- (void)imagePickerControllerDidCancel:(UIImagePickerController *)picker {
+    [picker dismissViewControllerAnimated:YES completion:nil];
+}
+
+#pragma mark - UI 布局
 
 -(void)setupStack
 {
@@ -71,7 +164,7 @@
         ]];
     }
 
-    // Header - 已移除 AAAC (复测提示)，系统运行时间将自动上移
+    // Header - 保持你要求的 5 行 Subtitles 结构
     DOHeaderView *headerView = [[DOHeaderView alloc] initWithImage: [UIImage imageNamed:@"Dopamine"] subtitles: @[
         [DOGlobalAppearance mainSubtitleString:[[DOEnvironmentManager sharedManager] versionSupportString]],
         [DOGlobalAppearance secondarySubtitleString:DOLocalizedString(@"Credits_Made_By") withAlpha:0.8],
@@ -172,6 +265,8 @@
         }
     });
 }
+
+#pragma mark - 系统其他方法
 
 - (NSString *)jailbreakButtonTitle {
     BOOL isJailbroken = [[DOEnvironmentManager sharedManager] isJailbroken];
