@@ -27,9 +27,8 @@
 @property(nonatomic) BOOL hideStatusBar;
 @property(nonatomic) BOOL hideHomeIndicator;
 
-// 新增背景视图属性
+// 新增属性
 @property (nonatomic, strong) UIImageView *backgroundImageView;
-// 将 actionView 设为属性，方便控制透明度
 @property (nonatomic, strong) DOActionMenuView *actionView;
 
 @end
@@ -48,8 +47,10 @@
     // 3. 初始化长按手势
     [self setupGesture];
     
-    // 4. 初次加载应用时刷新一次透明度
-    [self updateUITransparency];
+    // 4. 确保在UI渲染完成后刷新一次透明度
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self updateUITransparency];
+    });
 }
 
 #pragma mark - 背景与智能 UI 逻辑
@@ -88,32 +89,30 @@
     [self updateUITransparency];
 }
 
-// 核心功能：实现中间和底部按钮的同步透明逻辑
+// 核心优化：递归查找并调整 MaterialView 透明度
+- (void)applyTransparencyToView:(UIView *)view alpha:(CGFloat)alpha {
+    for (UIView *subview in view.subviews) {
+        if ([NSStringFromClass([subview class]) containsString:@"Material"]) {
+            subview.alpha = alpha;
+        }
+        [self applyTransparencyToView:subview alpha:alpha]; // 深度递归
+    }
+}
+
 - (void)updateUITransparency {
     BOOL hasCustomBG = (self.backgroundImageView.image != nil);
+    CGFloat targetAlpha = hasCustomBG ? 0.0 : 1.0;
     
     [UIView animateWithDuration:0.4 options:UIViewAnimationOptionCurveEaseInOut animations:^{
-        // 1. 处理中间菜单 (DOActionMenuView)
+        // 1. 处理中间菜单
         if (self.actionView) {
-            // 有背景图时去掉容器背景，没背景图时恢复原生 0.05 的极浅白色背景（防止看不清文字）
             self.actionView.backgroundColor = hasCustomBG ? [UIColor clearColor] : [UIColor colorWithWhite:1.0 alpha:0.05];
-            
-            for (UIView *subview in self.actionView.subviews) {
-                // 递归查找并关闭毛玻璃层 (MTMaterialView)
-                if ([NSStringFromClass([subview class]) containsString:@"Material"]) {
-                    subview.alpha = hasCustomBG ? 0.0 : 1.0;
-                }
-            }
+            [self applyTransparencyToView:self.actionView alpha:targetAlpha];
         }
         
-        // 2. 处理底部按钮 (DOJailbreakButton)
+        // 2. 处理底部越狱按钮 (同步透明)
         if (self.jailbreakBtn) {
-            for (UIView *subview in self.jailbreakBtn.subviews) {
-                // 同步处理底部按钮的毛玻璃层
-                if ([NSStringFromClass([subview class]) containsString:@"Material"]) {
-                    subview.alpha = hasCustomBG ? 0.0 : 1.0;
-                }
-            }
+            [self applyTransparencyToView:self.jailbreakBtn alpha:targetAlpha];
         }
     } completion:nil];
 }
@@ -200,7 +199,7 @@
         ]];
     }
 
-    // Header - 保持你要求的 5 行结构
+    // Header
     DOHeaderView *headerView = [[DOHeaderView alloc] initWithImage: [UIImage imageNamed:@"Dopamine"] subtitles: @[
         [DOGlobalAppearance mainSubtitleString:[[DOEnvironmentManager sharedManager] versionSupportString]],
         [DOGlobalAppearance secondarySubtitleString:DOLocalizedString(@"Credits_Made_By") withAlpha:0.8],
@@ -260,8 +259,7 @@
 
         if(otherJailbreakActived(false)) {
             UIAlertController *alertController = [UIAlertController alertControllerWithTitle:DOLocalizedString(@"Error") message:DOLocalizedString(@"Your device currently has another jailbreak activated, please reboot device.") preferredStyle:UIAlertControllerStyleAlert];
-            UIAlertAction *rebootAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Close") style:UIAlertActionStyleDefault handler:nil];
-            [alertController addAction:rebootAction];
+            [alertController addAction:[UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Close") style:UIAlertActionStyleDefault handler:nil]];
             [self presentViewController:alertController animated:YES completion:nil];
             return;
         }
