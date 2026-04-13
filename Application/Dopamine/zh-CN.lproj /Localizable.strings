@@ -42,6 +42,7 @@
 "Settings_iDownload" = "iDownload (开发者终端)";
 "Settings_Verbose_Logs" = "详细日志";
 "Settings_Apps_JIT" = "允许 App 使用 JIT";
+"Settings_Allow_Old_arm64e_ABI_Libraries" = "允许使用旧版arm64e架构的ABI库";
 "Settings_Jetsam_Multiplier" = "Jetsam 倍数";
 
 // Settings Buttons
@@ -59,7 +60,11 @@
 "Section_Actions" = "操作";
 "Section_Customization" = "自定义";
 "Section_Exploits" = "漏洞利用";
+"Section_Boot_Logo" = "启动图标";
 "Jetsam_Description" = "Jetsam 是一个系统守护进程，它会自动终止超过指定内存限制的进程。当安装了大量插件后，某些进程可能在启动时或启动后没多久内存使用超出限制，被 Jetsam 终止，导致进程循环崩溃。你可以选择一个倍数来扩大所有带内存限制进程的限制。如果你的系统在安装了大量插件之后出现频繁崩溃或者各种异常行为，请适当地增加这个倍数。但为了不对系统内存使用产生负面影响，建议选择能够使系统稳定运行的最低倍数。";
+"Enabled" = "启用";
+"Custom_Boot_Logo" = "自定义启动图标";
+"Select_Image" = "选择图片";
 
 // Settings Alerts
 "Alert_Tweak_Injection_Toggled_Title" = "需要重启用户空间";
