@@ -61,7 +61,7 @@
 "Section_Customization" = "自定义";
 "Section_Exploits" = "漏洞利用";
 "Section_Boot_Logo" = "启动图标";
-"Jetsam_Description" = "Jetsam 是一个系统守护进程，它会自动终止超过指定内存限制的进程。当安装了大量插件后，某些进程可能在启动时或启动后没多久内存使用超出限制，被 Jetsam 终止，导致进程循环崩溃。你可以选择一个倍数来扩大所有带内存限制进程的限制。如果你的系统在安装了大量插件之后出现频繁崩溃或者各种异常行为，请适当地增加这个倍数。但为了不对系统内存使用产生负面影响，建议选择能够使系统稳定运行的最低倍数。";
+"Jetsam_Description" = "Jetsam 是一个系统守护进程，它会自动终止超过指定内存限制的进程。如果你安装了大量插件后出现崩溃，请适当增加这个倍数。建议选择能够使系统稳定运行的最低倍数。";
 "Enabled" = "启用";
 "Custom_Boot_Logo" = "自定义启动图标";
 "Select_Image" = "选择图片";
@@ -72,9 +72,9 @@
 "Alert_Tweak_Injection_Toggled_Reboot_Now" = "立即重启";
 "Alert_Tweak_Injection_Toggled_Reboot_Later" = "稍后重启";
 "Alert_Remove_Jailbreak_Title" = "移除越狱";
-"Alert_Remove_Jailbreak_Pressed_Body" = "“移除越狱” 将移除所有和越狱相关的文件，而常规的 App、文档及数据不会受到任何影响。请注意，此操作无法撤销。确认要移除越狱吗？";
-"Alert_Remove_Jailbreak_Enabled_Body" = "“移除越狱” 将在下次越狱时移除所有和越狱相关的文件，而常规的 App、文档及数据不会受到任何影响。请注意，此操作无法撤销。确认要移除越狱吗？";
-"Alert_Change_Mobile_Password_Body" = "这将会在你的设备上修改 “mobile” 密码，此密码可用于使用 sudo 命令。如需设置 “root” 密码，请在 shell 中使用命令 “sudo passwd root”。";
+"Alert_Remove_Jailbreak_Pressed_Body" = "“移除越狱” 将移除所有和越狱相关的文件，此操作无法撤销。确认要移除越狱吗？";
+"Alert_Remove_Jailbreak_Enabled_Body" = "“移除越狱” 将在下次越狱时移除所有相关文件。确认要移除越狱吗？";
+"Alert_Change_Mobile_Password_Body" = "这将修改你的 “mobile” 用户密码（用于 sudo 命令）。";
 "Password_Placeholder" = "密码";
 "Repeat_Password_Placeholder" = "重复密码";
 "Button_Change" = "修改";
@@ -82,9 +82,9 @@
 "Button_Continue" = "继续";
 
 // Duplicate Apps Errors
-"Duplicate_Apps_Error_Dopamine_App" = "检测到多个标识符为 \"%@\" 的 App 在 Dopamine 的 App 目录中 (\"%@\")，无法继续。";
-"Duplicate_Apps_Error_User_App" = "检测到标识符为 \"%@\" 的 App 存在 Dopamine 的 App 目录中 (\"%@\") ，但其已被单独安装在系统上，无法继续。";
-"Duplicate_Apps_Error_Icon_Cache" = "检测到标识符为 \"%@\" 的 App 存在于 Dopamine 的 App 目录中 (\"%@\")，但其已在不同路径 (\"%@\") 下注册了图标缓存，无法继续。";
+"Duplicate_Apps_Error_Dopamine_App" = "检测到多个标识符为 \"%@\" 的 App 在 Dopamine 的 App 目录中 (\"%@\")。";
+"Duplicate_Apps_Error_User_App" = "检测到标识符为 \"%@\" 的 App 已单独安装在系统上，无法继续。";
+"Duplicate_Apps_Error_Icon_Cache" = "检测到标识符为 \"%@\" 的 App 已在不同路径下注册了图标缓存。";
 
 // Settings Lists
 "Theme" = "主题";
@@ -102,7 +102,7 @@
 // Logs
 "Initializing Environment" = "初始化环境";
 "Initializing Protection" = "初始化保护";
-"Loading BaseBin TrustCache" = "将基础套件加载至信任缓存 (TrustCache)";
+"Loading BaseBin TrustCache" = "加载基础套件信任缓存";
 "Applying Bind Mount" = "应用绑定挂载";
 "Removing Jailbreak" = "移除越狱";
 "Elevating Privileges" = "提升权限";
@@ -114,28 +114,27 @@
 "Bypassing PAC (%@)" = "正在绕过 PAC (%@)";
 "Bypassing PPL (%@)" = "正在绕过 PPL (%@)";
 
-// Package Manager selection
+// Package Manager
 "Status_Title_Select_Package_Managers" = "请选择包管理器";
-"Select_Package_Managers_Install_Message" = "如果你不确定选择哪一个比较好，请选择 Sileo";
+"Select_Package_Managers_Install_Message" = "如果不确定，请选择 Sileo";
 "Continue" = "继续";
 
 // New Features (Dyld & Spinlock)
 "Enable dyld patch" = "启用 dyld 补丁";
 "Dyld Patch(Spinlock Fix)" = "dyld 补丁 (Spinlock 修复)";
-"When spinlock fix is enabled, app extensions of blacklisted apps will be disabled and may also cause spinlock panics when the blacklisted app is in foreground/background.\n\nYou can first try disabling tweak injection for the app in Choicy (spinlock fix still works), and only blacklist the app if that doesn't work." = "启用 spinlock 修复后，黑名单应用的应用扩展将被禁用，并且当黑名单应用处于前台或后台时，还可能导致 spinlock 崩溃。\n\n你可以先尝试在 Choicy 中为该应用禁用插件注入（此时 spinlock 修复仍然有效），只有在无效时再将该应用加入黑名单。";
+"When_Spinlock_Fix_Hint" = "启用修复后，黑名单应用的扩展将被禁用。建议先在 Choicy 中尝试。";
 
 // Mount Management
 "Input_Mmount_Title" = "新增挂载";
 "Input_Unmount_Title" = "管理挂载";
 "Input_Mount_Title" = "输入原始路径";
 "Error_Mount_Body" = "目标文件夹不存在";
-"Select_Mount_Title" = "选择需要操作的路径";
+"Select_Mount_Title" = "选择路径";
 "Button_Delete_Path_Only" = "仅删除路径";
 "Button_Delete" = "取消挂载";
 "Button_View" = "Filza 查看";
 "Button_Mount" = "确定";
-
 "Input_Unmount_Title_B" = "输入原始路径";
-"Input_Unmount_Path" = "输入原始路径";
+"Input_Unmount_Path" = "输入路径";
 "Button_Unmount" = "确定";
 "System_Uptime_Format" = "已运行: %d天 %d时 %d分 %d秒";
