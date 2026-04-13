@@ -20,7 +20,7 @@
 		</dict>
 	</dict>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Dopamine needs to access your photo library to support picking a boot logo</string>
+	<string>我们需要访问您的相册以更换首页背景或开机 Logo</string>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 </dict>
