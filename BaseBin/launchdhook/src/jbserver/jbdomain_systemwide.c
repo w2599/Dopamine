@@ -429,7 +429,7 @@ int systemwide_fork_fix(audit_token_t *parentToken, uint64_t childPid)
 			uint64_t parentEntry    = kread_ptr(parentHeader + koffsetof(vm_map_header, links) + koffsetof(vm_map_links, next));
 
 			uint64_t childHeader   = childVmMap + koffsetof(vm_map, hdr);
-			uint32_t childNentries = kread32(parentHeader + koffsetof(vm_map_header, nentries));
+			uint32_t childNentries = kread32(childHeader + koffsetof(vm_map_header, nentries));
 			uint64_t childEntry    = kread_ptr(childHeader + koffsetof(vm_map_header, links) + koffsetof(vm_map_links, next));
 
 			uint64_t childFirstEntry = childEntry, parentFirstEntry = parentEntry;
