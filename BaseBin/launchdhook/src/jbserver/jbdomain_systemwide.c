@@ -323,7 +323,7 @@ int systemwide_process_checkin(audit_token_t *processToken, char **rootPathOut, 
 #ifdef __arm64e__
 	// On arm64e every image has a trust level associated with it
 	// "In trust cache" trust levels have higher runtime enforcements, this can be a problem for some tools as Dopamine trustcaches everything that's adhoc signed
-	// So we add the ability for a binary to get a different trust level using the "jb.pmap_cs_custom_trust" entitlement
+	// So we add the ability for a binary to get a different trust level using the "jb.pmap_cs.custom_trust" entitlement
 	// This is for binaries that rely on weaker PMAP_CS checks (e.g. Lua trampolines need it)
 	xpc_object_t customTrustObj = xpc_copy_entitlement_for_token("jb.pmap_cs.custom_trust", processToken);
 	if (customTrustObj) {
@@ -368,7 +368,7 @@ int systemwide_fork_fix(audit_token_t *parentToken, uint64_t childPid)
 			uint64_t parentEntry    = kread_ptr(parentHeader + koffsetof(vm_map_header, links) + koffsetof(vm_map_links, next));
 
 			uint64_t childHeader   = childVmMap + koffsetof(vm_map, hdr);
-			uint32_t childNentries = kread32(parentHeader + koffsetof(vm_map_header, nentries));
+			uint32_t childNentries = kread32(childHeader + koffsetof(vm_map_header, nentries));
 			uint64_t childEntry    = kread_ptr(childHeader + koffsetof(vm_map_header, links) + koffsetof(vm_map_links, next));
 
 			uint64_t childFirstEntry = childEntry, parentFirstEntry = parentEntry;
