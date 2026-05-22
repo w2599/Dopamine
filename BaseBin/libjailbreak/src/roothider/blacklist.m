@@ -50,7 +50,8 @@ NSString *getAppIdentifierFromPath(const char *path) {
 
 NSArray* builtinApps = @[
     @"com.opa334.Dopamine-roothide",
-    @"com.zqbb.Dopamine-roothide"
+    @"com.zqbb.Dopamine-roothide",
+    @"cn.zqbb.drh"
 ];
 
 bool isBlacklistedApp(const char* identifier)
