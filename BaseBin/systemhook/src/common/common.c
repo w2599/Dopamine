@@ -1,4 +1,5 @@
 #include "common.h"
+#include "roothider.h"
 #include <xpc/xpc.h>
 #include <xpc_private.h>
 #include <mach-o/dyld.h>
@@ -118,7 +119,8 @@ xpc_object_t jbuserconfig_get_value(const char *key)
 	return NULL;
 }
 
-static kSpawnConfig spawn_config_for_executable(const char* path, char *const argv[restrict])
+
+kSpawnConfig spawn_config_for_executable(const char* path, char *const argv[restrict])
 {
 	// Blacklist to ensure general system stability
 	// I don't like this but for some processes it seems neccessary
@@ -204,14 +206,14 @@ static int spawn_exec_hook_common(bool isExec,
 		const char *msSafeModeValue = envbuf_getenv((const char **)envp, "_MSSafeMode");
 		if (safeModeValue) {
 			if (!strcmp(safeModeValue, "1")) {
-				shouldInsertJBEnv = false;
+				if(!allowInjectWithSafeMode(path)) shouldInsertJBEnv = false;
 				hasSafeModeVariable = true;
 				break;
 			}
 		}
 		if (msSafeModeValue) {
 			if (!strcmp(msSafeModeValue, "1")) {
-				shouldInsertJBEnv = false;
+				if(!allowInjectWithSafeMode(path)) shouldInsertJBEnv = false;
 				hasSafeModeVariable = true;
 				break;
 			}

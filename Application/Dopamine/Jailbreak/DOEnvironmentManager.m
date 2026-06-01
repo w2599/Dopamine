@@ -97,6 +97,7 @@ extern char **environ;
     return [[self privatePrebootPath] stringByAppendingPathComponent:bootManifestString];
 }
 
+/*
 - (void)locateJailbreakRoot
 {
     if (!gSystemInfo.jailbreakInfo.rootPath) {
@@ -212,6 +213,7 @@ extern char **environ;
     
     return error;
 }
+*/
 
 - (BOOL)isArm64e
 {
@@ -276,6 +278,13 @@ extern char **environ;
 
 - (void)updateJailbreakState
 {
+/************** roothide specific ***********/
+    if(!jbclient_roothide_jailbroken())
+        return NO;
+/************** roothide specific ********/
+
+    
+    static BOOL jailbroken = NO;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         char *jbVersionC = NULL;
@@ -323,7 +332,13 @@ extern char **environ;
 
 - (NSString *)systemVersion
 {
-    return (__bridge NSString *)MGCopyAnswer((__bridge CFStringRef)@"ProductVersion");
+    __block NSString *version;
+    [self runAsRoot:^{
+        [self runUnsandboxed:^{
+            version = [NSString stringWithContentsOfFile:JBROOT_PATH(@"/basebin/.version") encoding:NSUTF8StringEncoding error:nil];
+        }];
+    }];
+    return [[version componentsSeparatedByString:@"."] lastObject];
 }
 
 - (BOOL)isBootstrapped
@@ -606,6 +621,7 @@ extern char **environ;
     }
 }
 
+/*
 - (BOOL)isFakelibMounted
 {
     struct statfs fsb;
@@ -674,6 +690,7 @@ extern char **environ;
         actionBlock();
     }
 }
+*/
 
 - (NSString *)accessibleKernelPath
 {

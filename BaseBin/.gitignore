@@ -16,3 +16,6 @@ boomerang/boomerang
 jbctl/jbctl
 idownloadd/idownloadd
 dopamine/dopamine
+jailbreakd/jailbreakd
+bootstrapper/bootstrapper
+jbupdate.sh

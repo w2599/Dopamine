@@ -23,8 +23,7 @@
 {
     self = [super init];
     if (self) {
-        NSString *home = [NSString stringWithUTF8String:getenv("HOME")];
-        _preferencesPath = [home stringByAppendingPathComponent:@"Library/Preferences/com.opa334.Dopamine.plist"];
+        _preferencesPath = [NSHomeDirectory() stringByAppendingPathComponent:@"Library/Preferences/com.opa334.Dopamine-roothide.plist"];
         [self loadPreferences];
     }
     return self;

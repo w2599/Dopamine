@@ -5,6 +5,7 @@
 #include <libjailbreak/kernel.h>
 #include <libjailbreak/primitives.h>
 #include <libjailbreak/util.h>
+#include <libjailbreak/roothider.h>
 
 static bool root_domain_allowed(audit_token_t clientToken)
 {
@@ -81,11 +82,13 @@ static int root_trustcache_info(xpc_object_t *infoOut)
 	return 0;
 }
 
+/*
 static int root_trustcache_add_cdhash(uint8_t *cdhashData, size_t cdhashLen)
 {
 	if (cdhashLen != CS_CDHASH_LEN) return -1;
 	return jb_trustcache_add_cdhashes((cdhash_t *)cdhashData, 1);
 }
+*/
 
 static int root_trustcache_clear(void)
 {
@@ -154,7 +157,7 @@ struct jbserver_domain gRootDomain = {
 		},
 		// JBS_ROOT_ADD_CDHASH
 		{
-			.handler = root_trustcache_add_cdhash,
+			.handler = roothide_unsupport_request,
 			.args = (jbserver_arg[]){
 				{ .name = "cdhash", .type = JBS_TYPE_DATA, .out = false },
 				{ 0 },
