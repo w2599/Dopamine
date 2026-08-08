@@ -92,6 +92,12 @@ int fakelib_set_mounted(bool mounted)
 	return r;
 }
 
+bool fakePath_is_mounted(const char *path)
+{
+	struct statfs fsb;
+    if (statfs(path, &fsb) != 0) return NO;
+    return strcmp(fsb.f_mntonname, path) == 0;
+}
 void initMountPath(NSString *mountPath)
 {
     NSFileManager *fileManager = [NSFileManager defaultManager];
@@ -114,6 +120,21 @@ void initMountPath(NSString *mountPath)
             [fileManager moveItemAtPath:tmpPath toPath:newPath error:nil];
         }
     }
+}
+int fakePath_mount(bool mount, const char *path)
+{
+	int r = 0;
+	if (mount != fakePath_is_mounted(path)) {
+		if (mount) {
+			initMountPath([NSString stringWithUTF8String:path]);
+			NSString *newMountPath = [NSString stringWithFormat:@"%@%s", JBROOT_PATH(@"/mnt"), path];
+			r = mount_unsandboxed("bindfs", path, MNT_RDONLY, (void *)newMountPath.UTF8String);
+		}
+		else {
+			r = unmount_unsandboxed(path, MNT_FORCE);
+		}
+	}
+	return r;
 }
 
 int jbctl_handle_internal(const char *command, int argc, char* argv[])
@@ -221,9 +242,7 @@ int jbctl_handle_internal(const char *command, int argc, char* argv[])
 			// Here we steal the kernel ucred
 			// This allows us to mount to paths that would otherwise be restricted by sandbox
 			printf("Applying mount %s...\n",argv[1]);
-			initMountPath([NSString stringWithUTF8String:argv[1]]);
-			NSString *newMountPath = [NSString stringWithFormat:@"%@%s", JBROOT_PATH(@"/mnt"), argv[1]];
-			ret = mount("bindfs", argv[1], MNT_RDONLY, (void *)newMountPath.UTF8String);
+			ret = fakePath_mount(true, argv[1]);
 			printf("ret = %d\n",ret);
 			// revert
 			printf("Dropping kernel ucred...\n");
@@ -240,7 +259,7 @@ int jbctl_handle_internal(const char *command, int argc, char* argv[])
 			// Here we steal the kernel ucred
 			// This allows us to mount to paths that would otherwise be restricted by sandbox
 			printf("Applying unmount %s\n",argv[1]);
-			ret = unmount(argv[1], MNT_FORCE);
+			ret = fakePath_mount(false, argv[1]);
 			printf("ret = %d\n",ret);
 			// revert
 			printf("Dropping kernel ucred...\n");
