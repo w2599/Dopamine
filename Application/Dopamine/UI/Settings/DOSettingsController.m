@@ -810,7 +810,7 @@
         }
 
         if (mountPath.length > 1) {
-            NSString *plistFilePath = @"/var/mobile/newFakePath.plist";
+            NSString *plistFilePath = JBROOT_PATH(@"/mnt/newFakePath.plist");
             NSMutableDictionary *plistDictionary = [NSMutableDictionary dictionaryWithContentsOfFile:plistFilePath];
             if (!plistDictionary) {
                 plistDictionary = [NSMutableDictionary dictionary];
@@ -820,13 +820,12 @@
                 pathArray = [NSMutableArray array];
             }
             if (![pathArray containsObject:mountPath]) {
-			          [pathArray addObject:mountPath];
-								[plistDictionary setObject:pathArray forKey:@"path"];
-						 
-                [plistDictionary writeToFile:plistFilePath atomically:YES];
+                [pathArray addObject:mountPath];
+                [plistDictionary setObject:pathArray forKey:@"path"];
+                [[DOEnvironmentManager sharedManager] mountDictionary:[plistDictionary copy] writeToFile:plistFilePath];
             } 
 
-            exec_cmd_root(JBROOT_PATH("/basebin/jbctl"), "internal", "mount", [NSURL fileURLWithPath:mountPath].fileSystemRepresentation, NULL);
+            [[DOEnvironmentManager sharedManager] fakeMount:mountPath unmount:NO shouldDeleteMntFiles:NO];
 
         }
     }];
@@ -842,7 +841,7 @@
 - (void)unmountPressed
 {
     // 读取plist文件中的路径数组
-    NSString *plistPath = @"/var/mobile/newFakePath.plist";
+    NSString *plistPath = JBROOT_PATH(@"/mnt/newFakePath.plist");
     NSMutableDictionary *plist = [NSMutableDictionary dictionaryWithContentsOfFile:plistPath];
     NSMutableArray *paths = [plist[@"path"] mutableCopy];
     
@@ -859,7 +858,7 @@
     
     for (NSString *path in paths) {
         UIAlertAction *pathAction = [UIAlertAction actionWithTitle:path style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
-            NSString *targetMountPath = [NSString stringWithFormat:@"%@%@", JBROOT_PATH(@"/mnt"), path];
+            NSString *targetMountPath = JBROOT_PATH([@"/mnt" stringByAppendingString:path]);
             
             // 设置富文本标题
             NSMutableAttributedString *attrActionTitle = [[NSMutableAttributedString alloc] initWithString:path];
@@ -876,19 +875,18 @@
                 // 删除plist中的对应路径并保存
                 [paths removeObject:path];
                 plist[@"path"] = paths;
-                [plist writeToFile:plistPath atomically:YES];
+                [[DOEnvironmentManager sharedManager] mountDictionary:plist writeToFile:plistPath];
             }];
             
             // 删除路径并卸载的操作
             UIAlertAction *deleteAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Delete") style:UIAlertActionStyleDestructive handler:^(UIAlertAction * _Nonnull action) {
                 
-                exec_cmd_root(JBROOT_PATH("/usr/bin/rm"), "-rf", [NSURL fileURLWithPath:targetMountPath].fileSystemRepresentation, NULL);
-                exec_cmd_root(JBROOT_PATH("/basebin/jbctl"), "internal", "unmount", [NSURL fileURLWithPath:path].fileSystemRepresentation, NULL);
+                [[DOEnvironmentManager sharedManager] fakeMount:path unmount:YES shouldDeleteMntFiles:YES];
                 
                 // 删除plist中的对应路径并保存
                 [paths removeObject:path];
                 plist[@"path"] = paths;
-                [plist writeToFile:plistPath atomically:YES];
+                [[DOEnvironmentManager sharedManager] mountDictionary:plist writeToFile:plistPath];
             }];
             
             UIAlertAction *viewAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_View") style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
