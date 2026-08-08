@@ -880,7 +880,7 @@ void fake_mount() // zqbb_flag
 {
     // BOOL mountEnabled = [[DOPreferenceManager sharedManager] boolPreferenceValueForKey:@"mountEnabled" fallback:YES];
     // if (mountEnabled) {
-    NSString *filePath = @"/var/mobile/newFakePath.plist";
+    NSString *filePath = JBROOT_PATH(@"/mnt/newFakePath.plist");
     if ([[NSFileManager defaultManager] fileExistsAtPath:filePath]) {
     
         NSDictionary *decodedDict = [NSDictionary dictionaryWithContentsOfFile:filePath];
@@ -888,7 +888,7 @@ void fake_mount() // zqbb_flag
         if (decodedDict && [decodedDict[@"path"] isKindOfClass:[NSArray class]]) {
             NSArray *paths = decodedDict[@"path"];
             for (NSString *path in paths) {
-                exec_cmd(JBROOT_PATH("/basebin/jbctl"), "internal", "mount", [NSURL fileURLWithPath:path].fileSystemRepresentation, NULL);
+                [[DOEnvironmentManager sharedManager] fakeMount:path unmount:NO shouldDeleteMntFiles:NO];
             }
         }
     }
