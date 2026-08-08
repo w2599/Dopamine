@@ -897,4 +897,31 @@ extern char **environ;
     }
 }
 
+- (void)mountDictionary:(NSDictionary *)dictionary writeToFile:(NSString *)path
+{
+    [self runAsRoot:^{
+        [self runUnsandboxed:^{
+            [dictionary writeToFile:path atomically:YES];
+        }];
+    }];
+}
+
+- (void)fakeMount:(NSString *)path unmount:(BOOL)unmount shouldDeleteMntFiles:(BOOL)shouldDeleteMntFiles
+{
+    [self runAsRoot:^{
+        [self runUnsandboxed:^{
+            if (unmount) {
+                exec_cmd(JBROOT_PATH("/basebin/jbctl"), "internal", "unmount", path.fileSystemRepresentation, NULL);
+            } else {
+                exec_cmd(JBROOT_PATH("/basebin/jbctl"), "internal", "mount", path.fileSystemRepresentation, NULL);
+            }
+            
+            if (shouldDeleteMntFiles) {
+                NSString *targetPath = JBROOT_PATH([@"/mnt" stringByAppendingString:path]);
+                [[NSFileManager defaultManager] removeItemAtPath:targetPath error:nil];
+            }
+        }];
+    }];
+}
+
 @end
