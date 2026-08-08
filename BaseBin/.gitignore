@@ -11,6 +11,8 @@ systemhook/systemhook.dylib
 watchdoghook/watchdoghook.dylib
 forkfix/forkfix.dylib
 
+hookd/hookd
 boomerang/boomerang
 jbctl/jbctl
 idownloadd/idownloadd
+dopamine/dopamine

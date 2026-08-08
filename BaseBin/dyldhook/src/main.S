@@ -67,14 +67,16 @@ MAKE_TRAMPOLINE(strcmp)
 MAKE_TRAMPOLINE(strncmp)
 MAKE_TRAMPOLINE(strlen)
 MAKE_TRAMPOLINE(strstr)
-MAKE_TRAMPOLINE(strcpy)
-MAKE_TRAMPOLINE(strcat)
+MAKE_TRAMPOLINE(strlcpy)
+MAKE_TRAMPOLINE(strlcat)
 MAKE_TRAMPOLINE(close)
 MAKE_TRAMPOLINE(open)
 MAKE_TRAMPOLINE(fcntl)
 MAKE_TRAMPOLINE(mmap)
 MAKE_TRAMPOLINE(_simple_getenv)
-MAKE_TRAMPOLINE_ALIAS(mig_get_reply_port, dyld_mig_get_reply_port)
+MAKE_TRAMPOLINE(_simple_dprintf)
+MAKE_TRAMPOLINE(mach_init)
+MAKE_TRAMPOLINE(mig_get_reply_port)
 
 #if IOS>=16
 MAKE_TRAMPOLINE(mach_msg_overwrite)
@@ -84,10 +86,23 @@ MAKE_TRAMPOLINE(mach_msg)
 #endif
 
 DEF_SYSCALL(read, 3)
+DEF_SYSCALL(write, 4)
 DEF_SYSCALL(access, 33)
 DEF_SYSCALL(lseek, 199)
 DEF_SYSCALL(__sandbox_ms, 381)
 DEF_SYSCALL(fileport_makeport, 430)
+DEF_SYSCALL(setuid, 23)
+DEF_SYSCALL(setreuid, 126)
+DEF_SYSCALL(setgid, 181)
+DEF_SYSCALL(setregid, 127)
+DEF_SYSCALL(setgroups, 80)
+
+// DEF_SYSCALL(getuid, 24)
+// DEF_SYSCALL(geteuid, 25)
+// DEF_SYSCALL(getgid, 47)
+// DEF_SYSCALL(getegid, 43)
+// DEF_SYSCALL(getppid, 39)
+
 
 .data
 .global ___stack_chk_guard

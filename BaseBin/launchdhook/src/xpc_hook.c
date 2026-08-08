@@ -6,6 +6,7 @@
 #include <sandbox.h>
 #include <substrate.h>
 #include <libjailbreak/jbserver.h>
+#include <litehook.h>
 
 mach_msg_header_t* dispatch_mach_msg_get_msg(void *message, size_t *_Nullable size_ptr);
 int jbserver_received_mach_message(audit_token_t *auditToken, struct jbserver_mach_msg *jbsMachMsg);
@@ -62,5 +63,6 @@ int xpc_receive_mach_msg_hook(void *msg, void *a2, void *a3, void *a4, xpc_objec
 
 void initXPCHooks(void)
 {
-	MSHookFunction(xpc_receive_mach_msg, (void *)xpc_receive_mach_msg_hook, (void **)&xpc_receive_mach_msg_orig);
+	xpc_receive_mach_msg_orig = xpc_receive_mach_msg;
+	litehook_rebind_symbol(LITEHOOK_REBIND_GLOBAL, xpc_receive_mach_msg, xpc_receive_mach_msg_hook, NULL);
 }

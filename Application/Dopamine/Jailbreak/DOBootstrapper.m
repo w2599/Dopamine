@@ -6,12 +6,12 @@
 //
 
 #import "DOBootstrapper.h"
+#import "DOBootstrapper+zstd.h"
 #import "DOEnvironmentManager.h"
 #import "DOUIManager.h"
 #import <libjailbreak/info.h>
 #import <libjailbreak/util.h>
 #import <libjailbreak/jbclient_xpc.h>
-#import "zstd.h"
 #import <sys/mount.h>
 #import <dlfcn.h>
 #import <sys/stat.h>
@@ -20,11 +20,13 @@
 #define LIBKRW_DOPAMINE_BUNDLED_VERSION @"2.0.3"
 #define LIBROOT_DOPAMINE_BUNDLED_VERSION @"1.0.1"
 #define BASEBIN_LINK_BUNDLED_VERSION @"1.0.0"
+#define LAUNCHCTL_BUNDLED_VERSION @"1:1.2.0"
 
 static NSDictionary *gBundledPackages = @{
     @"libkrw0-dopamine" : LIBKRW_DOPAMINE_BUNDLED_VERSION,
     @"libroot-dopamine" : LIBROOT_DOPAMINE_BUNDLED_VERSION,
     @"dopamine-basebin-link" : BASEBIN_LINK_BUNDLED_VERSION,
+    @"launchctl" : LAUNCHCTL_BUNDLED_VERSION,
 };
 
 struct hfs_mount_args {
@@ -41,17 +43,6 @@ struct hfs_mount_args {
 };
 
 NSString *const bootstrapErrorDomain = @"BootstrapErrorDomain";
-typedef NS_ENUM(NSInteger, JBErrorCode) {
-    BootstrapErrorCodeFailedToGetURL            = -1,
-    BootstrapErrorCodeFailedToDownload          = -2,
-    BootstrapErrorCodeFailedDecompressing       = -3,
-    BootstrapErrorCodeFailedExtracting          = -4,
-    BootstrapErrorCodeFailedRemount             = -5,
-    BootstrapErrorCodeFailedFinalising          = -6,
-    BootstrapErrorCodeFailedReplacing           = -7,
-};
-
-#define BUFFER_SIZE 8192
 
 @implementation DOBootstrapper
 
@@ -63,147 +54,6 @@ typedef NS_ENUM(NSInteger, JBErrorCode) {
         _urlSession = [NSURLSession sessionWithConfiguration:config delegate:self delegateQueue:nil];*/
     }
     return self;
-}
-
-- (NSError *)decompressZstd:(NSString *)zstdPath toTar:(NSString *)tarPath
-{
-    // Open the input file for reading
-    FILE *input_file = fopen(zstdPath.fileSystemRepresentation, "rb");
-    if (input_file == NULL) {
-        return [NSError errorWithDomain:bootstrapErrorDomain code:BootstrapErrorCodeFailedDecompressing userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"Failed to open input file %@: %s", zstdPath, strerror(errno)]}];
-    }
-
-    // Open the output file for writing
-    FILE *output_file = fopen(tarPath.fileSystemRepresentation, "wb");
-    if (output_file == NULL) {
-        fclose(input_file);
-        return [NSError errorWithDomain:bootstrapErrorDomain code:BootstrapErrorCodeFailedDecompressing userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"Failed to open output file %@: %s", tarPath, strerror(errno)]}];
-    }
-
-    // Create a ZSTD decompression context
-    ZSTD_DCtx *dctx = ZSTD_createDCtx();
-    if (dctx == NULL) {
-        fclose(input_file);
-        fclose(output_file);
-        return [NSError errorWithDomain:bootstrapErrorDomain code:BootstrapErrorCodeFailedDecompressing userInfo:@{NSLocalizedDescriptionKey : @"Failed to create ZSTD decompression context"}];
-    }
-
-    // Create a buffer for reading input data
-    uint8_t *input_buffer = (uint8_t *) malloc(BUFFER_SIZE);
-    if (input_buffer == NULL) {
-        ZSTD_freeDCtx(dctx);
-        fclose(input_file);
-        fclose(output_file);
-        return [NSError errorWithDomain:bootstrapErrorDomain code:BootstrapErrorCodeFailedDecompressing userInfo:@{NSLocalizedDescriptionKey : @"Failed to allocate input buffer"}];
-    }
-
-    // Create a buffer for writing output data
-    uint8_t *output_buffer = (uint8_t *) malloc(BUFFER_SIZE);
-    if (output_buffer == NULL) {
-        free(input_buffer);
-        ZSTD_freeDCtx(dctx);
-        fclose(input_file);
-        fclose(output_file);
-        return [NSError errorWithDomain:bootstrapErrorDomain code:BootstrapErrorCodeFailedDecompressing userInfo:@{NSLocalizedDescriptionKey : @"Failed to allocate output buffer"}];
-    }
-
-    // Create a ZSTD decompression stream
-    ZSTD_inBuffer in = {0};
-    ZSTD_outBuffer out = {0};
-    ZSTD_DStream *dstream = ZSTD_createDStream();
-    if (dstream == NULL) {
-        free(output_buffer);
-        free(input_buffer);
-        ZSTD_freeDCtx(dctx);
-        fclose(input_file);
-        fclose(output_file);
-        return [NSError errorWithDomain:bootstrapErrorDomain code:BootstrapErrorCodeFailedDecompressing userInfo:@{NSLocalizedDescriptionKey : @"Failed to create ZSTD decompression stream"}];
-    }
-
-    // Initialize the ZSTD decompression stream
-    size_t ret = ZSTD_initDStream(dstream);
-    if (ZSTD_isError(ret)) {
-        ZSTD_freeDStream(dstream);
-        free(output_buffer);
-        free(input_buffer);
-        ZSTD_freeDCtx(dctx);
-        fclose(input_file);
-        fclose(output_file);
-        return [NSError errorWithDomain:bootstrapErrorDomain code:BootstrapErrorCodeFailedDecompressing userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"Failed to initialize ZSTD decompression stream: %s", ZSTD_getErrorName(ret)]}];
-    }
-    
-    // Read and decompress the input file
-    size_t total_bytes_read = 0;
-    size_t total_bytes_written = 0;
-    size_t bytes_read;
-    size_t bytes_written;
-    while (1) {
-        // Read input data into the input buffer
-        bytes_read = fread(input_buffer, 1, BUFFER_SIZE, input_file);
-        if (bytes_read == 0) {
-            if (feof(input_file)) {
-                // End of input file reached, break out of loop
-                break;
-            } else {
-                ZSTD_freeDStream(dstream);
-                free(output_buffer);
-                free(input_buffer);
-                ZSTD_freeDCtx(dctx);
-                fclose(input_file);
-                fclose(output_file);
-                return [NSError errorWithDomain:bootstrapErrorDomain code:BootstrapErrorCodeFailedDecompressing userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"Failed to read input file: %s", strerror(errno)]}];
-            }
-        }
-
-        in.src = input_buffer;
-        in.size = bytes_read;
-        in.pos = 0;
-
-        while (in.pos < in.size) {
-            // Initialize the output buffer
-            out.dst = output_buffer;
-            out.size = BUFFER_SIZE;
-            out.pos = 0;
-
-            // Decompress the input data
-            ret = ZSTD_decompressStream(dstream, &out, &in);
-            if (ZSTD_isError(ret)) {
-                ZSTD_freeDStream(dstream);
-                free(output_buffer);
-                free(input_buffer);
-                ZSTD_freeDCtx(dctx);
-                fclose(input_file);
-                fclose(output_file);
-                return [NSError errorWithDomain:bootstrapErrorDomain code:BootstrapErrorCodeFailedDecompressing userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"Failed to decompress input data: %s", ZSTD_getErrorName(ret)]}];
-            }
-
-            // Write the decompressed data to the output file
-            bytes_written = fwrite(output_buffer, 1, out.pos, output_file);
-            if (bytes_written != out.pos) {
-                ZSTD_freeDStream(dstream);
-                free(output_buffer);
-                free(input_buffer);
-                ZSTD_freeDCtx(dctx);
-                fclose(input_file);
-                fclose(output_file);
-                return [NSError errorWithDomain:bootstrapErrorDomain code:BootstrapErrorCodeFailedDecompressing userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"Failed to write output file: %s", strerror(errno)]}];
-            }
-
-            total_bytes_written += bytes_written;
-        }
-
-        total_bytes_read += bytes_read;
-    }
-
-    // Clean up resources
-    ZSTD_freeDStream(dstream);
-    free(output_buffer);
-    free(input_buffer);
-    ZSTD_freeDCtx(dctx);
-    fclose(input_file);
-    fclose(output_file);
-
-    return nil;
 }
 
 - (NSError *)extractTar:(NSString *)tarPath toPath:(NSString *)destinationPath
@@ -255,14 +105,16 @@ typedef NS_ENUM(NSInteger, JBErrorCode) {
 - (BOOL)isPrivatePrebootMountedWritable
 {
     struct statfs ppStfs;
-    statfs("/private/preboot", &ppStfs);
+    statfs([[DOEnvironmentManager sharedManager] privatePrebootPath].fileSystemRepresentation, &ppStfs);
     return !(ppStfs.f_flags & MNT_RDONLY);
 }
 
 - (int)remountPrivatePrebootWritable:(BOOL)writable
 {
+    const char *ppPath = [[DOEnvironmentManager sharedManager] privatePrebootPath].fileSystemRepresentation;
+
     struct statfs ppStfs;
-    int r = statfs("/private/preboot", &ppStfs);
+    int r = statfs(ppPath, &ppStfs);
     if (r != 0) return r;
     
     uint32_t flags = MNT_UPDATE;
@@ -274,7 +126,7 @@ typedef NS_ENUM(NSInteger, JBErrorCode) {
         .fspec = ppStfs.f_mntfromname,
         .hfs_mask = 0,
     };
-    return mount("apfs", "/private/preboot", flags, &mntargs);
+    return mount("apfs", ppPath, flags, &mntargs);
 }
 
 - (NSError *)ensurePrivatePrebootIsWritable
@@ -342,7 +194,7 @@ typedef NS_ENUM(NSInteger, JBErrorCode) {
 {
     uint64_t cfver = (((uint64_t)kCFCoreFoundationVersionNumber / 100) * 100);
     if (cfver >= 2000) {
-        return nil;
+        return @"1900";
     }
     return [NSString stringWithFormat:@"%llu", cfver];
 }
@@ -391,6 +243,24 @@ typedef NS_ENUM(NSInteger, JBErrorCode) {
     completion(nil);
 }
 
+- (NSError *)updateVarJbSymlink
+{
+    // Remove /var/jb as it might be wrong
+    NSError *error;
+    if (![self deleteSymlinkAtPath:@"/var/jb" error:&error]) {
+        if ([[NSFileManager defaultManager] fileExistsAtPath:@"/var/jb"]) {
+            if (![[NSFileManager defaultManager] removeItemAtPath:@"/var/jb" error:&error]) {
+                return [NSError errorWithDomain:bootstrapErrorDomain code:BootstrapErrorCodeFailedReplacing userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"Removing /var/jb directory failed with error: %@", error]}];
+            }
+        }
+        else {
+            return [NSError errorWithDomain:bootstrapErrorDomain code:BootstrapErrorCodeFailedReplacing userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"Removing /var/jb symlink failed with error: %@", error]}];
+        }
+    }
+
+    return [self createSymlinkAtPath:@"/var/jb" toPath:JBROOT_PATH(@"/") createIntermediateDirectories:YES];;
+}
+
 - (void)prepareBootstrapWithCompletion:(void (^)(NSError *))completion
 {
     [[DOUIManager sharedInstance] sendLog:@"Updating BaseBin" debug:NO];
@@ -403,20 +273,6 @@ typedef NS_ENUM(NSInteger, JBErrorCode) {
     }
     
     [self fixupPathPermissions];
-    
-    // Remove /var/jb as it might be wrong
-    if (![self deleteSymlinkAtPath:@"/var/jb" error:&error]) {
-        if ([[NSFileManager defaultManager] fileExistsAtPath:@"/var/jb"]) {
-            if (![[NSFileManager defaultManager] removeItemAtPath:@"/var/jb" error:&error]) {
-                completion([NSError errorWithDomain:bootstrapErrorDomain code:BootstrapErrorCodeFailedReplacing userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"Removing /var/jb directory failed with error: %@", error]}]);
-                return;
-            }
-        }
-        else {
-            completion([NSError errorWithDomain:bootstrapErrorDomain code:BootstrapErrorCodeFailedReplacing userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"Removing /var/jb symlink failed with error: %@", error]}]);
-            return;
-        }
-    }
     
     // Clean up xinaA15 v1 leftovers if desired
     if (![[NSFileManager defaultManager] fileExistsAtPath:@"/var/.keep_symlinks"]) {
@@ -475,7 +331,7 @@ typedef NS_ENUM(NSInteger, JBErrorCode) {
     
     NSString *basebinPath = JBROOT_PATH(@"/basebin");
     NSString *installedPath = JBROOT_PATH(@"/.installed_dopamine");
-    error = [self createSymlinkAtPath:@"/var/jb" toPath:JBROOT_PATH(@"/") createIntermediateDirectories:YES];
+    error = [self updateVarJbSymlink];
     if (error) {
         completion(error);
         return;
@@ -493,7 +349,6 @@ typedef NS_ENUM(NSInteger, JBErrorCode) {
         return;
     }
     [self patchBasebinDaemonPlists];
-    [[NSFileManager defaultManager] removeItemAtPath:JBROOT_PATH(@"/basebin/basebin.tc") error:nil];
     
     void (^bootstrapFinishedCompletion)(NSError *) = ^(NSError *error){
         if (error) {
@@ -533,6 +388,10 @@ typedef NS_ENUM(NSInteger, JBErrorCode) {
         }
         
         JBFixMobilePermissions();
+
+        // Add setuid bit to jbctl
+        // Allows us in the end to reboot userspace after we're already mobile
+        chmod(JBROOT_PATH("/basebin/jbctl"), S_ISUID | 0755);
 
         completion(nil);
     };
@@ -658,9 +517,20 @@ typedef NS_ENUM(NSInteger, JBErrorCode) {
     BOOL shouldInstallLibroot = [self shouldInstallPackage:@"libroot-dopamine"];
     BOOL shouldInstallLibkrw = [self shouldInstallPackage:@"libkrw0-dopamine"];
     BOOL shouldInstallBasebinLink = [self shouldInstallPackage:@"dopamine-basebin-link"];
+    BOOL shouldInstallLaunchctl = NO;
+    if (__builtin_available(iOS 19.0, *)) {
+        shouldInstallLaunchctl = [self shouldInstallPackage:@"launchctl"];
+    }
     
-    if (shouldInstallLibroot || shouldInstallLibkrw || shouldInstallBasebinLink) {
+    if (shouldInstallLibroot || shouldInstallLibkrw || shouldInstallBasebinLink || shouldInstallLaunchctl) {
         [[DOUIManager sharedInstance] sendLog:@"Updating Bundled Packages" debug:NO];
+
+        if (shouldInstallLaunchctl) {
+            NSString *launchctlPath = [[NSBundle mainBundle].bundlePath stringByAppendingPathComponent:@"launchctl_1_1.2.0_iphoneos-arm64.deb"];
+            int r = [self installPackage:launchctlPath];
+            if (r != 0) return [NSError errorWithDomain:bootstrapErrorDomain code:BootstrapErrorCodeFailedFinalising userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"Failed to install launchctl: %d\n", r]}];
+        }
+
         if (shouldInstallLibroot) {
             NSString *librootPath = [[NSBundle mainBundle].bundlePath stringByAppendingPathComponent:@"libroot.deb"];
             int r = [self installPackage:librootPath];

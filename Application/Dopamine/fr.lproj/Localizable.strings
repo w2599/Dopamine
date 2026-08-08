@@ -84,9 +84,16 @@
 "Theme" = "Thème";
 "Kernel Exploit" = "Exploit du noyau";
 "PPL Bypass" = "Contournement PPL";
+"SPTM Bypass" = "Contournement SPTM";
 "PAC Bypass" = "Contournement PAC";
 /*None*/
 /*Recommended*/
+
+// DarkSword Workaround
+/*Respring_Required*/
+/*Respring_Required_Message*/
+/*Respring_Required_Notice_A8*/
+/*Apply_Workaround*/
 
 // Credits
 "Credits_Button_Discord" = "Discord";
@@ -107,6 +114,7 @@
 "Exploiting Kernel (%@)" = "Exploitation du noyau (%@)";
 "Bypassing PAC (%@)" = "Contournement des PAC (%@)";
 "Bypassing PPL (%@)" = "Contournement du PPL (%@)";
+"Bypassing SPTM (%@)" = "Contournement du SPTM (%@)";
 
 // Package Manager selection
 "Status_Title_Select_Package_Managers" = "Gestionnaires de paquets";

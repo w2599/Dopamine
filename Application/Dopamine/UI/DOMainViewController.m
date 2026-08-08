@@ -14,6 +14,7 @@
 #import "DOUpdateViewController.h"
 #import "DOLogCrashViewController.h"
 #import <pthread.h>
+#import <sys/sysctl.h>
 #import <libjailbreak/libjailbreak.h>
 
 @interface DOMainViewController ()
@@ -121,7 +122,7 @@
     ]];
     
     //Jailbreak Button
-    BOOL isJailbroken = [[DOEnvironmentManager sharedManager] isJailbroken];
+    BOOL isJailbroken = [[DOEnvironmentManager sharedManager] isJailbroken] || [[DOEnvironmentManager sharedManager] isJailbrokenWithOtherJailbreak];
     BOOL isSupported = [[DOEnvironmentManager sharedManager] isSupported];
 
     NSString *jailbreakButtonTitle = [self jailbreakButtonTitle];
@@ -202,6 +203,35 @@
     [[DOUIManager sharedInstance] startLogCapture];
     
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
+        if ([jailbreaker contiguousMappingWorkaroundNeeded]) {
+            
+            cpu_subtype_t cpuFamily = 0;
+            size_t cpuFamilySize = sizeof(cpuFamily);
+            sysctlbyname("hw.cpufamily", &cpuFamily, &cpuFamilySize, NULL, 0);
+            NSString *workaroundMessage = DOLocalizedString(@"Respring_Required_Message");
+            if (cpuFamily == CPUFAMILY_ARM_TYPHOON) {
+                workaroundMessage = [workaroundMessage stringByAppendingString:[NSString stringWithFormat:@"\n\n%@", DOLocalizedString(@"Respring_Required_Notice_A8")]];
+            }
+
+            UIAlertController *contiguousMappingWorkaroundAlertController = [UIAlertController alertControllerWithTitle:DOLocalizedString(@"Respring_Required") message:workaroundMessage preferredStyle:UIAlertControllerStyleAlert];
+            
+            UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Cancel") style:UIAlertActionStyleCancel handler:^(UIAlertAction * _Nonnull action) {
+                exit(0);
+            }];
+            
+            UIAlertAction *workaroundAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Apply_Workaround") style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
+                [jailbreaker applyContiguousMappingWorkaround];
+            }];
+            
+            [contiguousMappingWorkaroundAlertController addAction:cancelAction];
+            [contiguousMappingWorkaroundAlertController addAction:workaroundAction];
+            contiguousMappingWorkaroundAlertController.preferredAction = workaroundAction;
+
+            dispatch_async(dispatch_get_main_queue(), ^{
+                [self presentViewController:contiguousMappingWorkaroundAlertController animated:YES completion:nil];
+            });
+            return;
+        }
 
         //We need to get the preconfig mutex to start the jailbreak (self.jailbreakBtn.canStartJailbreak)
         [self.jailbreakBtn lockMutex];

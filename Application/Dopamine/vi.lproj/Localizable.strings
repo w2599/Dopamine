@@ -87,9 +87,16 @@
 "Theme" = "Chủ đề";
 "Kernel Exploit" = "Lỗ hổng Kernel";
 "PPL Bypass" = "Lỗ hổng PPL";
+"SPTM Bypass" = "Lỗ hổng SPTM";
 "PAC Bypass" = "Lỗ hổng PAC";
 "None" = "Không có";
 "Recommended" = "Đề xuất";
+
+// DarkSword Workaround
+/*Respring_Required*/
+/*Respring_Required_Message*/
+/*Respring_Required_Notice_A8*/
+/*Apply_Workaround*/
 
 // Credits
 "Credits_Button_Discord" = "Discord";
@@ -110,6 +117,7 @@
 "Exploiting Kernel (%@)" = "Kh.thác lỗ hổng Kernel (%@)";
 "Bypassing PAC (%@)" = "Kh.thác lỗ hổng PAC (%@)";
 "Bypassing PPL (%@)" = "Kh.thác lỗ hổng PPL (%@)";
+"Bypassing SPTM (%@)" = "Kh.thác lỗ hổng SPTM (%@)";
 
 // Package Manager selection
 "Status_Title_Select_Package_Managers" = "Chọn trình quản lý gói";

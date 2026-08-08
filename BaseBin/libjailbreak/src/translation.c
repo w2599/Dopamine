@@ -5,35 +5,59 @@
 #include <errno.h>
 #include <stdio.h>
 
-struct tt_level {
-	uint64_t offMask;
-	uint64_t shift;
-	uint64_t indexMask;
-	uint64_t validMask;
-	uint64_t typeMask;
-	uint64_t typeBlock;
-};
 struct tt_level arm_tt_level[4];
 
 // Address translation physical <-> virtual
 
-#define PTOV_TABLE_SIZE 8
-uint64_t phystokv(uint64_t pa)
+uint64_t sptm_phystokv(uint64_t pa)
 {
-	struct ptov_table_entry {
-		uint64_t pa;
-		uint64_t va;
-		uint64_t len;
-	} ptov_table[PTOV_TABLE_SIZE];
-	kreadbuf(ksymbol(ptov_table), &ptov_table[0], sizeof(ptov_table));
+	uint64_t papt_table = kread_ptr(ksymbol(libsptm_papt_ranges));
+	uint64_t papt_table_n = kread32(kread64(ksymbol(libsptm_n_papt_ranges)));
 
-	for (uint64_t i = 0; (i < PTOV_TABLE_SIZE) && (ptov_table[i].len != 0); i++) {
-		if ((pa >= ptov_table[i].pa) && (pa < (ptov_table[i].pa + ptov_table[i].len))) {
-			return pa - ptov_table[i].pa + ptov_table[i].va;
+	struct sptm_papt_entry {
+		uint64_t paddr_start;
+		uint64_t papt_start;
+		uint64_t num_mappings;
+	} sptm_papt_table[papt_table_n];
+
+	kreadbuf(papt_table, &sptm_papt_table[0], sizeof(sptm_papt_table));
+
+	for (uint64_t i = 0; i < papt_table_n; i++) {
+		struct sptm_papt_entry *curEntry = &sptm_papt_table[i];
+
+		uint64_t len = curEntry->num_mappings * vm_real_kernel_page_size;
+		if ((pa >= curEntry->paddr_start) && (pa < (curEntry->paddr_start + len))) {
+			return pa - curEntry->paddr_start + curEntry->papt_start;
 		}
 	}
 
-	return pa - kconstant(physBase) + kconstant(virtBase);
+	return 0;
+}
+
+#define PTOV_TABLE_SIZE 8
+uint64_t phystokv(uint64_t pa)
+{
+	if (ksymbol(ptov_table)) {
+		struct ptov_table_entry {
+			uint64_t pa;
+			uint64_t va;
+			uint64_t len;
+		} ptov_table[PTOV_TABLE_SIZE];
+		kreadbuf(ksymbol(ptov_table), &ptov_table[0], sizeof(ptov_table));
+
+		for (uint64_t i = 0; (i < PTOV_TABLE_SIZE) && (ptov_table[i].len != 0); i++) {
+			if ((pa >= ptov_table[i].pa) && (pa < (ptov_table[i].pa + ptov_table[i].len))) {
+				return pa - ptov_table[i].pa + ptov_table[i].va;
+			}
+		}
+
+		return pa - kconstant(physBase) + kconstant(virtBase);
+	}
+	else if (ksymbol(libsptm_papt_ranges)) {
+		return sptm_phystokv(pa);
+	}
+
+	return 0;
 }
 
 uint64_t vtophys_lvl(uint64_t tte_ttep, uint64_t va, uint64_t *leaf_level, uint64_t *leaf_tte_ttep)

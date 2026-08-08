@@ -84,9 +84,16 @@
 "Theme" = "Темы";
 "Kernel Exploit" = "Эксплоит Ядра";
 "PPL Bypass" = "Обход PPL";
+"SPTM Bypass" = "Обход SPTM";
 "PAC Bypass" = "Обход PAC";
 /*None*/
 /*Recommended*/
+
+// DarkSword Workaround
+/*Respring_Required*/
+/*Respring_Required_Message*/
+/*Respring_Required_Notice_A8*/
+/*Apply_Workaround*/
 
 // Credits
 "Credits_Button_Discord" = "Discord";
@@ -107,6 +114,7 @@
 "Exploiting Kernel (%@)" = "Эксплуатация ядра (%@)";
 "Bypassing PAC (%@)" = "Обход PAC (%@)";
 "Bypassing PPL (%@)" = "Обход PPL (%@)";
+"Bypassing SPTM (%@)" = "Обход SPTM (%@)";
 
 // Package Manager selection
 "Status_Title_Select_Package_Managers" = "Выберите менеджер(ы) пакетов";

@@ -9,6 +9,17 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+extern NSString *const bootstrapErrorDomain;
+typedef NS_ENUM(NSInteger, BootstrapErrorCode) {
+    BootstrapErrorCodeFailedToGetURL            = -1,
+    BootstrapErrorCodeFailedToDownload          = -2,
+    BootstrapErrorCodeFailedDecompressing       = -3,
+    BootstrapErrorCodeFailedExtracting          = -4,
+    BootstrapErrorCodeFailedRemount             = -5,
+    BootstrapErrorCodeFailedFinalising          = -6,
+    BootstrapErrorCodeFailedReplacing           = -7,
+};
+
 @interface DOBootstrapper : NSObject <NSURLSessionDelegate, NSURLSessionDownloadDelegate>
 {
     NSURLSession *_urlSession;
@@ -17,6 +28,7 @@ NS_ASSUME_NONNULL_BEGIN
 }
 
 - (void)prepareBootstrapWithCompletion:(void (^)(NSError *))completion;
+- (NSError *)updateVarJbSymlink;
 - (NSError *)ensurePrivatePrebootIsWritable;
 - (NSError *)installPackageManagers;
 - (NSError *)finalizeBootstrap;

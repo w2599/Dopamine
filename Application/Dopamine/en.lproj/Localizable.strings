@@ -91,9 +91,16 @@
 "Theme" = "Theme";
 "Kernel Exploit" = "Kernel Exploit";
 "PPL Bypass" = "PPL Bypass";
+"SPTM Bypass" = "SPTM Bypass";
 "PAC Bypass" = "PAC Bypass";
 "None" = "None";
 "Recommended" = "Recommended";
+
+// DarkSword Workaround
+"Respring_Required" = "Respring Required";
+"Respring_Required_Message" = "The selected Kernel exploit requires creating a contiguous memory mapping which on this device is only possible with a special workaround that performs a respring. After the respring is done, reopen the Dopamine app and press \"Jailbreak\" again.";
+"Respring_Required_Notice_A8" = "On your device the workaround does not work every time and you may need to apply it multiple times until this alert no longer appears.";
+"Apply_Workaround" = "Apply Workaround";
 
 // Credits
 "Credits_Button_Discord" = "Discord";
@@ -114,6 +121,7 @@
 "Exploiting Kernel (%@)" = "Exploiting Kernel (%@)";
 "Bypassing PAC (%@)" = "Bypassing PAC (%@)";
 "Bypassing PPL (%@)" = "Bypassing PPL (%@)";
+"Bypassing SPTM (%@)" = "Bypassing SPTM (%@)";
 
 // Package Manager selection
 "Status_Title_Select_Package_Managers" = "Select Package Manager(s)";

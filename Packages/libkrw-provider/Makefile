@@ -7,7 +7,7 @@ LDFLAGS = -dynamiclib -rpath /var/jb/usr/lib -L../../BaseBin/.build -ljailbreak
 all: $(TARGET) sign
 
 sign: $(TARGET)
-	@ldid -S $^
+	@ldid -Cadhoc -S $^
 
 $(TARGET): $(wildcard src/*.c)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^

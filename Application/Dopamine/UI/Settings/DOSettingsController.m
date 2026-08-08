@@ -160,6 +160,7 @@
         
         SEL defGetter = @selector(readPreferenceValue:);
         SEL defSetter = @selector(setPreferenceValue:specifier:);
+        SEL expGetter = @selector(readExploitPreferenceValue:);
         
         NSSortDescriptor *prioritySortDescriptor = [NSSortDescriptor sortDescriptorWithKey:@"priority" ascending:NO];
         
@@ -180,7 +181,7 @@
                 exploitGroupSpecifier.name = DOLocalizedString(@"Section_Exploits");
                 [specifiers addObject:exploitGroupSpecifier];
                 
-                PSSpecifier *kernelExploitSpecifier = [PSSpecifier preferenceSpecifierNamed:DOLocalizedString(@"Kernel Exploit") target:self set:defSetter get:defGetter detail:nil cell:PSLinkListCell edit:nil];
+                PSSpecifier *kernelExploitSpecifier = [PSSpecifier preferenceSpecifierNamed:DOLocalizedString(@"Kernel Exploit") target:self set:defSetter get:expGetter detail:nil cell:PSLinkListCell edit:nil];
                 [kernelExploitSpecifier setProperty:@YES forKey:@"enabled"];
                 [kernelExploitSpecifier setProperty:exploitManager.preferredKernelExploit.identifier forKey:@"default"];
                 kernelExploitSpecifier.detailControllerClass = [DOPSExploitListItemsController class];
@@ -191,7 +192,7 @@
                 [specifiers addObject:kernelExploitSpecifier];
                 
                 if (envManager.isArm64e) {
-                    PSSpecifier *pacBypassSpecifier = [PSSpecifier preferenceSpecifierNamed:DOLocalizedString(@"PAC Bypass") target:self set:defSetter get:defGetter detail:nil cell:PSLinkListCell edit:nil];
+                    PSSpecifier *pacBypassSpecifier = [PSSpecifier preferenceSpecifierNamed:DOLocalizedString(@"PAC Bypass") target:self set:defSetter get:expGetter detail:nil cell:PSLinkListCell edit:nil];
                     [pacBypassSpecifier setProperty:@YES forKey:@"enabled"];
                     DOExploit *preferredPACBypass = exploitManager.preferredPACBypass;
                     if (!preferredPACBypass) {
@@ -207,7 +208,13 @@
                     [pacBypassSpecifier setProperty:([envManager isPACBypassRequired] ? _availablePACBypasses.firstObject.identifier : @"none") forKey:@"recommendedExploitIdentifier"];
                     [specifiers addObject:pacBypassSpecifier];
                     
-                    PSSpecifier *pplBypassSpecifier = [PSSpecifier preferenceSpecifierNamed:DOLocalizedString(@"PPL Bypass") target:self set:defSetter get:defGetter detail:nil cell:PSLinkListCell edit:nil];
+                    NSString *pplBypassName = @"PPL Bypass";
+                    if ([DOEnvironmentManager sharedManager].isSPTM) {
+                        // SPTM bypasses are also handled as PPL bypasses in the code, we just change the name of the setting in the UI
+                        pplBypassName = @"SPTM Bypass";
+                    }
+
+                    PSSpecifier *pplBypassSpecifier = [PSSpecifier preferenceSpecifierNamed:DOLocalizedString(pplBypassName) target:self set:defSetter get:expGetter detail:nil cell:PSLinkListCell edit:nil];
                     [pplBypassSpecifier setProperty:@YES forKey:@"enabled"];
                     [pplBypassSpecifier setProperty:exploitManager.preferredPPLBypass.identifier forKey:@"default"];
                     pplBypassSpecifier.detailControllerClass = [DOPSExploitListItemsController class];
@@ -399,6 +406,32 @@
     if (!value) {
         return [specifier propertyForKey:@"default"];
     }
+    return value;
+}
+
+- (id)readExploitPreferenceValue:(PSSpecifier *)specifier
+{
+    id value = [self readPreferenceValue:specifier];
+
+    SEL dataSourceSel = nil;
+    NSString *selString = [specifier propertyForKey:@"valuesDataSource"];
+    if (selString) {
+        dataSourceSel = NSSelectorFromString(selString);
+    }
+
+    if (dataSourceSel && [value isKindOfClass:[NSString class]]) {
+        NSString *valueString = (NSString *)value;
+
+        IMP imp = [specifier.target methodForSelector:dataSourceSel];
+        if (imp) {
+            NSArray *(*func)(id, SEL) = (void *)imp;
+            NSArray *availableIdentifiers = func(specifier.target, dataSourceSel);
+            if (![availableIdentifiers containsObject:valueString]) {
+                return [specifier propertyForKey:@"default"];
+            }
+        }
+    }
+
     return value;
 }
 

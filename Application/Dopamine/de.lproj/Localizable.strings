@@ -91,9 +91,16 @@
 "Theme" = "Farbschema";
 "Kernel Exploit" = "Kernel Exploit";
 "PPL Bypass" = "PPL Bypass";
+"SPTM Bypass" = "SPTM Bypass";
 "PAC Bypass" = "PAC Bypass";
 "None" = "Keiner";
 "Recommended" = "Empfohlen";
+
+// DarkSword Workaround
+/*Respring_Required*/
+/*Respring_Required_Message*/
+/*Respring_Required_Notice_A8*/
+/*Apply_Workaround*/
 
 // Credits
 "Credits_Button_Discord" = "Discord";
@@ -114,6 +121,7 @@
 "Exploiting Kernel (%@)" = "Exploite Kernel (%@)";
 "Bypassing PAC (%@)" = "Umgehe PAC (%@)";
 "Bypassing PPL (%@)" = "Umgehe PPL (%@)";
+"Bypassing SPTM (%@)" = "Umgehe SPTM (%@)";
 
 // Package Manager selection
 "Status_Title_Select_Package_Managers" = "Paket Manager auswählen";

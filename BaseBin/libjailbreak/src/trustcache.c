@@ -24,8 +24,11 @@ uint64_t _trustcache_list_get_start(void)
 	if (ksymbol(pmap_image4_trust_caches)) { // iOS <=15
 		return kread64(ksymbol(pmap_image4_trust_caches));
 	}
-	else if (ksymbol(ppl_trust_cache_rt)) {  // iOS >=16
+	else if (ksymbol(ppl_trust_cache_rt)) {  // iOS >=16, PPL
 		return kread64(kread64(ksymbol(ppl_trust_cache_rt) + 0x20));
+	}
+	else if (ksymbol_txm(txm_trustcache_root)) { // iOS >=17, SPTM/TXM
+		return kread64(kread64(ksymbol_txm(txm_trustcache_root) + 0x20));
 	}
 
 	return 0;
@@ -38,6 +41,9 @@ void _trustcache_list_set_start(uint64_t newStart)
 	}
 	else if (ksymbol(ppl_trust_cache_rt)) {  // iOS >=16
 		kwrite64(kread64(ksymbol(ppl_trust_cache_rt) + 0x20), newStart);
+	}
+	else if (ksymbol_txm(txm_trustcache_root)) { // iOS >=17, SPTM/TXM
+		kwrite64(kread64(ksymbol_txm(txm_trustcache_root) + 0x20), newStart);
 	}
 }
 
@@ -152,6 +158,9 @@ uint64_t _jb_trustcache_grow(void)
 	*(uint64_t *)(jbTc->trustcache + koffsetof(trustcache, fileptr)) = (jbTcKern + offsetof(jb_trustcache, file));
 	if (koffsetof(trustcache, size)) {
 		*(uint64_t *)(jbTc->trustcache + koffsetof(trustcache, size)) = JB_TRUSTCACHE_SIZE;
+	}
+	if (koffsetof(trustcache, type)) {
+		*(uint64_t *)(jbTc->trustcache + koffsetof(trustcache, type)) = 0x5;
 	}
 	kwritebuf(jbTcKern, jbTc, sizeof(*jbTc));
 	trustcache_list_insert(jbTcKern);
@@ -325,6 +334,9 @@ int trustcache_file_upload(trustcache_file_v1 *tc)
 	kwrite64(tcKaddr + koffsetof(trustcache, fileptr), tcFileKaddr);
 	if (koffsetof(trustcache, size)) {
 		kwrite64(tcKaddr + koffsetof(trustcache, size), tcSize);
+	}
+	if (koffsetof(trustcache, type)) {
+		kwrite64(tcKaddr + koffsetof(trustcache, type), 0x5);
 	}
 
 	trustcache_list_insert(tcKaddr);

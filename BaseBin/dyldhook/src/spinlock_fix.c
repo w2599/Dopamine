@@ -54,7 +54,7 @@ void __dsc_enumerate_mappings(uintptr_t slide, bool (*enumeratorFunc)(int fd, st
 
 	for (uint32_t i = 0; i < header.subCacheArrayCount; i++) {
 		char subcachePath[PATH_MAX];
-		strcpy(subcachePath, dscPath);
+		strlcpy(subcachePath, dscPath, sizeof(subcachePath));
 
 		// Only supports 1-9
 		// Since iOS 15 usually only has one subcache, this shall be fine
@@ -62,7 +62,7 @@ void __dsc_enumerate_mappings(uintptr_t slide, bool (*enumeratorFunc)(int fd, st
 		suffix[0] = '.';
 		suffix[1] = '1' + i;
 		suffix[2] = '\0';
-		strcat(subcachePath, suffix);
+		strlcat(subcachePath, suffix, sizeof(subcachePath));
 
 		int subcacheFd = open(subcachePath, O_RDONLY);
 		if (subcacheFd >= 0) {

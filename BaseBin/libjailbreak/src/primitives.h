@@ -53,6 +53,9 @@ int kwrite32(uint64_t va, uint32_t v);
 int kwrite16(uint64_t va, uint16_t v);
 int kwrite8(uint64_t va, uint8_t v);
 
+int physaccess_mapped(uint64_t pa, uint64_t size, kernel_map_accessor accessorBlock);
+int kaccess_mapped(uint64_t va, uint64_t size, kernel_map_accessor accessorBlock);
+
 int kcall(uint64_t *result, uint64_t func, int argc, const uint64_t *argv);
 int kexec(kRegisterState *state);
 

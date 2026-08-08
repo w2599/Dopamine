@@ -8,6 +8,7 @@
 #include <libjailbreak/kcall_Fugu14.h>
 #include <libjailbreak/kcall_arm64.h>
 #include <libjailbreak/jbserver_boomerang.h>
+#include <libjailbreak/stock_fixes.h>
 
 int main(int argc, char* argv[])
 {

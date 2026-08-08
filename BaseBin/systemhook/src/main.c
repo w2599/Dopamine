@@ -1,4 +1,4 @@
-#include "common.h"
+#include "common/common.h"
 
 #include <mach-o/dyld.h>
 #include <mach-o/dyld_images.h>
@@ -11,10 +11,14 @@
 #include <libjailbreak/jbclient_xpc.h>
 #include <libjailbreak/codesign.h>
 #include <libjailbreak/jbroot.h>
+#include <libjailbreak/hookd.h>
 #include "../dyldhook/src/dyld_jbinfo.h"
+#include "common/hookd_external.h"
+#include <choma/CSBlob.h>
 #include "litehook.h"
 #include "sandbox.h"
-#include "private.h"
+#include "common/private.h"
+#include "common/inline.h"
 
 bool gFullyDebugged = false;
 static void *gLibSandboxHandle;
@@ -99,7 +103,7 @@ void *dyld_dlsym_hook(void *dyld, void *handle, const char *name)
 
 int ptrace_hook(int request, pid_t pid, caddr_t addr, int data)
 {
-	int r = syscall(SYS_ptrace, request, pid, addr, data);
+	int r = ptrace_inline(request, pid, addr, data);
 
 	// ptrace works on any process when the caller is unsandboxed,
 	// but when the victim process does not have the get-task-allow entitlement,
@@ -204,12 +208,16 @@ bool should_enable_tweaks(void)
 		}
 	}
 
+	if (jbclient_dopamine_is_jailbroken(NULL)) {
+		// Probe whether we are the Dopamine app
+		// Only the Dopamine app is allowed to contact this domain
+		// In this case we want to disable tweak injection to prevent jailbreak detections etc messing with the app functionality
+		return false;
+	}
+
 	const char *tweaksDisabledPathSuffixes[] = {
 		// System binaries
 		"/usr/libexec/xpcproxy",
-
-		// Dopamine app itself (jailbreak detection bypass tweaks can break it)
-		"Dopamine.app/Dopamine",
 	};
 	for (size_t i = 0; i < sizeof(tweaksDisabledPathSuffixes) / sizeof(const char*); i++) {
 		if (string_has_suffix(gExecutablePath, tweaksDisabledPathSuffixes[i])) return false;
@@ -232,18 +240,72 @@ bool should_enable_tweaks(void)
 
 int __posix_spawn_hook(pid_t *restrict pid, const char *restrict path, struct _posix_spawn_args_desc *desc, char *const argv[restrict], char * const envp[restrict])
 {
-	return posix_spawn_hook_shared(pid, path, desc, argv, envp, (void *)__posix_spawn_orig, jbclient_trust_file_by_path, jbclient_platform_set_process_debugged, jbclient_jbsettings_get_double("jetsamMultiplier"));
+	return posix_spawn_hook_shared(pid, path, desc, argv, envp, (void *)__posix_spawn_inline, jbclient_trust_file_by_path, jbclient_platform_set_process_debugged, jbclient_jbsettings_get_double("jetsamMultiplier"));
 }
 
 int __posix_spawn_hook_with_filter(pid_t *restrict pid, const char *restrict path, char *const argv[restrict], char * const envp[restrict], struct _posix_spawn_args_desc *desc, int *ret)
 {
-	*ret = posix_spawn_hook_shared(pid, path, desc, argv, envp, (void *)__posix_spawn_orig, jbclient_trust_file_by_path, jbclient_platform_set_process_debugged, jbclient_jbsettings_get_double("jetsamMultiplier"));
+	*ret = posix_spawn_hook_shared(pid, path, desc, argv, envp, (void *)__posix_spawn_inline, jbclient_trust_file_by_path, jbclient_platform_set_process_debugged, jbclient_jbsettings_get_double("jetsamMultiplier"));
 	return 1;
 }
 
 int __execve_hook(const char *path, char *const argv[], char *const envp[])
 {
-	return execve_hook_shared(path, argv, envp, (void *)__execve_orig, jbclient_trust_file_by_path);
+	return execve_hook_shared(path, argv, envp, (void *)__execve_inline, jbclient_trust_file_by_path);
+}
+
+xpc_object_t copy_entitlements_xpc(void)
+{
+	pid_t pid = getpid();
+	CS_GenericBlob hdr = {0};
+
+	// Get size (will fail with ERANGE)
+	if (csops(pid, CS_OPS_ENTITLEMENTS_BLOB, &hdr, sizeof(hdr)) != 0) {
+		if (errno != ERANGE) {
+			return NULL;
+		}
+	}
+
+	if (hdr.length <= sizeof(hdr)) {
+		// No entitlements
+		return NULL;
+	}
+
+	// Get blob
+	void *buf = malloc(hdr.length);
+	if (!buf)
+		return NULL;
+
+	if (csops(pid, CS_OPS_ENTITLEMENTS_BLOB, buf, hdr.length) != 0) {
+		free(buf);
+		return NULL;
+	}
+
+	// Skip cs_blob header
+	const void *plist = (const uint8_t *)buf + sizeof(CS_GenericBlob);
+	size_t plist_size = hdr.length - sizeof(CS_GenericBlob);
+
+	// Convert to XPC dictionary
+	xpc_object_t obj = xpc_create_from_plist(plist, plist_size);
+
+	free(buf);
+
+	if (!obj || xpc_get_type(obj) != XPC_TYPE_DICTIONARY) {
+		if (obj) xpc_release(obj);
+		return NULL;
+	}
+
+	return obj;
+}
+
+bool process_requires_hookd(void)
+{
+	xpc_object_t entitlementsXdict = copy_entitlements_xpc();
+	if (!entitlementsXdict) return true;
+
+	bool requiresHookd = xpc_dictionary_get_bool(entitlementsXdict, "com.apple.private.cs.debugger") != true;
+	xpc_release(entitlementsXdict);
+	return requiresHookd;
 }
 
 const struct mach_header_64 *get_dyld_mach_header(void)
@@ -291,13 +353,13 @@ int parse_dyldhook_jbinfo(char **jbRootPathOut, char **bootUUIDOut, char **sandb
 }
 
 __attribute__((constructor)) static void initializer(void)
-{	
+{
 	// Under normal circumstances, dyldhook will have already handled the check-in, so get the check-in information from the __jbinfo section
 	// For more information on the check-in process, check the comments in dyldhook
 	if (parse_dyldhook_jbinfo(&JB_RootPath, &JB_BootUUID, &JB_SandboxExtensions, &gFullyDebugged) != 0) {
 		// If under any circumstances dyldhook has *not* performed a check-in, do it now
 		// This code path is taken inside xpcproxy on iOS 16, because launchd apparently no longer passes it a bootstrap port
-		if (jbclient_process_checkin(&JB_RootPath, &JB_BootUUID, &JB_SandboxExtensions, &gFullyDebugged) == 0) {
+		if (jbclient_process_checkin(&JB_RootPath, &JB_BootUUID, &JB_SandboxExtensions, &gFullyDebugged, NULL) == 0) {
 			consume_tokenized_sandbox_extensions(JB_SandboxExtensions);
 		}
 		else {
@@ -313,6 +375,30 @@ __attribute__((constructor)) static void initializer(void)
 	if (dyldInsertLibraries) {
 		if (!strcmp(dyldInsertLibraries, HOOK_DYLIB_PATH)) {
 			unsetenv("DYLD_INSERT_LIBRARIES");
+		}
+	}
+
+	// On iOS 26+, hooks have to be applied through hookd
+	if (__builtin_available(iOS 19.0, *)) {
+
+		// If available, use jbclient_mach_hookd_send_msg inside dyld instead...
+		// The reason for this is that dyldhook in itself is fully self contained without calling any external code
+		// We want to make sure no external code is invoked when some binary calls vm_protect
+		// This is mainly due to the fact if the binary is trying to remove the executable flag of a page our logic depends on, the binary will crash
+		// Frida is notorious for this, it hooks something in libsystem in every process it injects to
+		// Alternatively we could also
+		// - Implement inline mach_msg* syscalls into systemhook
+		// - Refactor all logic involving hookd into it's own library and implement the inline syscalls there
+		// But for now this works, the only problem could be something trying to hook a page in dyld itself....
+		void *dyld_jbclient_mach_hookd_send_msg = litehook_find_symbol(get_dyld_mach_header(), "_jbclient_mach_hookd_send_msg");
+		if (dyld_jbclient_mach_hookd_send_msg) {
+			hookd_send_msg = dyld_jbclient_mach_hookd_send_msg;
+		}
+
+		if (process_requires_hookd()) {
+			litehook_hook_memory = litehook_hook_memory_hookd;
+			litehook_hook_function(mach_vm_protect, mach_vm_protect_fixed);
+			init_hookd_external_support();
 		}
 	}
 
@@ -347,6 +433,11 @@ __attribute__((constructor)) static void initializer(void)
 	if (gDyldPtr) {
 		// TODO: Maybe we can just rebind sandbox_apply instead?
 		dyld_hook_routine(*gDyldPtr, 17, (void *)&dyld_dlsym_hook, (void **)&dyld_dlsym_orig, 0x839D);
+	} else {
+		void ***gAPIsPtr = litehook_find_dsc_symbol("/usr/lib/system/libdyld.dylib", "__ZN5dyld45gAPIsE");
+		if (gAPIsPtr) {
+			dyld_hook_routine(*gAPIsPtr, 16, (void *)&dyld_dlsym_hook, (void **)&dyld_dlsym_orig, 0x839D);
+		}
 	}
 
 #ifdef __arm64e__

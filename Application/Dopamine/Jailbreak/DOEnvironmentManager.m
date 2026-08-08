@@ -30,10 +30,9 @@
 #import <LocalAuthentication/LocalAuthentication.h>
 
 int reboot3(uint64_t flags, ...);
+CFPropertyListRef MGCopyAnswer(CFStringRef);
 
 @implementation DOEnvironmentManager
-
-@synthesize bootManifestHash = _bootManifestHash;
 
 + (instancetype)sharedManager
 {
@@ -86,20 +85,15 @@ int reboot3(uint64_t flags, ...);
     }
 }
 
-- (NSData *)bootManifestHash
+- (NSString *)privatePrebootPath
 {
-    if (!_bootManifestHash) {
-        io_registry_entry_t registryEntry = IORegistryEntryFromPath(kIOMainPortDefault, "IODeviceTree:/chosen");
-        if (registryEntry) {
-            _bootManifestHash = (__bridge NSData *)IORegistryEntryCreateCFProperty(registryEntry, CFSTR("boot-manifest-hash"), NULL, 0);
-        }
-    }
-    return _bootManifestHash;
+    return @"/private/preboot";
 }
 
 - (NSString *)activePrebootPath
 {
-    return [@"/private/preboot" stringByAppendingPathComponent:[self bootManifestHash].hexString];
+    NSString *bootManifestString = [NSString stringWithUTF8String:boot_manifest_hash()];
+    return [[self privatePrebootPath] stringByAppendingPathComponent:bootManifestString];
 }
 
 - (void)locateJailbreakRoot
@@ -202,17 +196,49 @@ int reboot3(uint64_t flags, ...);
 {
     cpu_subtype_t cpusubtype = 0;
     size_t len = sizeof(cpusubtype);
-    if (sysctlbyname("hw.cpusubtype", &cpusubtype, &len, NULL, 0) == -1) { return NO; }
+    if (sysctlbyname("hw.cpusubtype", &cpusubtype, &len, NULL, 0) == -1) return NO;
     return (cpusubtype & ~CPU_SUBTYPE_MASK) == CPU_SUBTYPE_ARM64E;
+}
+
+- (BOOL)isSPTM
+{
+    if (@available(iOS 17.0, *)) {
+        io_registry_entry_t memory_map = IORegistryEntryFromPath(kIOMainPortDefault, "IODeviceTree:/chosen/memory-map");
+        if (memory_map == IO_OBJECT_NULL)   return NO;
+
+        CFArrayRef keys = (CFArrayRef)IORegistryEntryCreateCFProperty(memory_map, CFSTR(kIORegistryEntryPropertyKeysKey), kCFAllocatorDefault, 0);
+        IOObjectRelease(memory_map);
+        if (!keys)  return NO;
+
+        CFRange range = CFRangeMake(0, CFArrayGetCount(keys));
+
+        bool isSPTM = CFArrayContainsValue(keys, range, CFSTR("SPTM")) && CFArrayContainsValue(keys, range, CFSTR("TXM"));
+        CFRelease(keys);
+
+        return isSPTM;
+    }
+    return false;
 }
 
 - (NSString *)versionSupportString
 {
+    cpu_subtype_t cpuFamily = 0;
+    size_t cpuFamilySize = sizeof(cpuFamily);
+    sysctlbyname("hw.cpufamily", &cpuFamily, &cpuFamilySize, NULL, 0);
+    
     if ([self isArm64e]) {
-        return @"iOS 15.0 - 16.5.1 (arm64e)";
+        if (cpuFamily == CPUFAMILY_ARM_VORTEX_TEMPEST || cpuFamily == CPUFAMILY_ARM_LIGHTNING_THUNDER) {
+            return @"iOS 15.0 - 18.7.1, 26.0 - 26.0.1 (A12/A13, PPL)";
+        }
+        else if (![self isSPTM]) {
+            return @"iOS 15.0 - 17.3.1 (PPL)";
+        }
+        else {
+            return @"iOS 17.0 - 17.3.1 (SPTM)";
+        }
     }
     else {
-        return @"iOS 15.0 - 15.8.6 / 16.0 - 16.6.1 (arm64)";
+        return @"iOS 15.0 - 18.7.1 (arm64)";
     }
 }
 
@@ -227,29 +253,50 @@ int reboot3(uint64_t flags, ...);
     return trollstoreInstallation;
 }
 
-- (BOOL)isJailbroken
+- (void)updateJailbreakState
 {
-    static BOOL jailbroken = NO;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
+        char *jbVersionC = NULL;
+        _isJailbroken = jbclient_dopamine_is_jailbroken(&jbVersionC);
+        if (jbVersionC) {
+            _jailbrokenVersion = [NSString stringWithUTF8String:jbVersionC];
+            free(jbVersionC);
+        }
+    });
+}
+
+- (BOOL)isJailbroken
+{
+    [self updateJailbreakState];
+    return _isJailbroken;
+}
+
+- (void)setJailbroken:(BOOL)jailbroken
+{
+    _isJailbroken = jailbroken;
+}
+
+- (BOOL)isJailbrokenWithOtherJailbreak
+{
+    if (![self isJailbroken]) {
         uint32_t csFlags = 0;
         csops(getpid(), CS_OPS_STATUS, &csFlags, sizeof(csFlags));
-        jailbroken = csFlags & CS_PLATFORM_BINARY;
-    });
-    return jailbroken;
+        return csFlags & CS_PLATFORM_BINARY;
+    }
+    return NO;
 }
 
 - (NSString *)jailbrokenVersion
 {
-    if (!self.isJailbroken) return nil;
+    [self updateJailbreakState];
+    if (!_isJailbroken) return nil;
+    return _jailbrokenVersion;
+}
 
-    __block NSString *version;
-    [self runAsRoot:^{
-        [self runUnsandboxed:^{
-            version = [NSString stringWithContentsOfFile:JBROOT_PATH(@"/basebin/.version") encoding:NSUTF8StringEncoding error:nil];
-        }];
-    }];
-    return version;
+- (NSString *)systemVersion
+{
+    return (__bridge NSString *)MGCopyAnswer((__bridge CFStringRef)@"ProductVersion");
 }
 
 - (BOOL)isBootstrapped
@@ -262,7 +309,7 @@ int reboot3(uint64_t flags, ...);
     if ([self isInstalledThroughTrollStore]) {
         unsandboxBlock();
     }
-    else if([self isJailbroken]) {
+    else if ([self isJailbroken]) {
         uint64_t labelBackup = 0;
         jbclient_root_set_mac_label(1, -1, &labelBackup);
         unsandboxBlock();
@@ -276,22 +323,20 @@ int reboot3(uint64_t flags, ...);
 
 - (void)runAsRoot:(void (^)(void))rootBlock
 {
-    uint32_t orgUser = getuid();
-    uint32_t orgGroup = getgid();
-    if (geteuid() == 0 && orgGroup == 0) {
+    uint32_t orgUser = geteuid();
+    uint32_t orgGroup = getegid();
+    
+    if (orgUser == 0 && orgGroup == 0) {
         rootBlock();
         return;
     }
 
-    int ur = 0, gr = 0;
-    if (orgUser != 0) ur = setuid(0);
-    if (orgGroup != 0) gr = setgid(0);
-    if (ur == 0 && gr == 0) {
-        rootBlock();
+    if (self.isJailbroken) {
+        if (jbclient_dopamine_get_root() == 0) {
+            rootBlock();
+            jbclient_dopamine_drop_root();
+        }
     }
-    
-    if (gr == 0 && orgGroup != 0) setgid(orgGroup);
-    if (ur == 0 && orgUser != 0) seteuid(orgUser);
 }
 
 - (int)runTrollStoreAction:(NSString *)action
@@ -308,44 +353,27 @@ int reboot3(uint64_t flags, ...);
 {
     [self runAsRoot:^{
         __block int pid = 0;
-        __block int r = 0;
         [self runUnsandboxed:^{
-            r = exec_cmd_suspended(&pid, JBROOT_PATH("/usr/bin/sbreload"), NULL);
+            int r = exec_cmd_suspended(&pid, JBROOT_PATH("/basebin/jbctl"), "respring", NULL);
             if (r == 0) {
                 kill(pid, SIGCONT);
             }
         }];
-        if (r == 0) {
-            if (cmd_wait_for_exit(pid) != 0) {
-                // Fallback
-                [self runUnsandboxed:^{
-                    killall("/usr/libexec/backboardd", SIGTERM);
-                }];
-            }
-        }
+        // We *NEED* to leave this block on iOS 17+ to avoid a panic, I added a usleep(10000) in jbctl to make sure this always happens
     }];
 }
 
 - (void)rebootUserspace
 {
     [self runAsRoot:^{
-        __block int pid = 0;
-        __block int r = 0;
         [self runUnsandboxed:^{
-            r = exec_cmd_suspended(&pid, JBROOT_PATH("/basebin/jbctl"), "reboot_userspace", NULL);
+            int pid = -1;
+            int r = exec_cmd_suspended(&pid, JBROOT_PATH("/basebin/jbctl"), "reboot_userspace", NULL);
             if (r == 0) {
-                // the original plan was to have the process continue outside of this block
-                // unfortunately sandbox blocks kill aswell, so it's a bit racy but works
-
-                // we assume we leave this unsandbox block before the userspace reboot starts
-                // to avoid leaking the label, this seems to work in practice
-                // and even if it doesn't work, leaking the label is no big deal
                 kill(pid, SIGCONT);
             }
         }];
-        if (r == 0) {
-            cmd_wait_for_exit(pid);
-        }
+        // We *NEED* to leave this block on iOS 17+ to avoid a panic, I added a usleep(10000) in jbctl to make sure this always happens
     }];
 }
 
@@ -577,7 +605,7 @@ int reboot3(uint64_t flags, ...);
 
 - (NSString *)accessibleKernelPath
 {
-    if ([self isInstalledThroughTrollStore]) {
+    if ([self isInstalledThroughTrollStore] || getuid() == 0) {
         NSString *kernelcachePath = [[self activePrebootPath] stringByAppendingPathComponent:@"System/Library/Caches/com.apple.kernelcaches/kernelcache"];
         if ([[NSFileManager defaultManager] fileExistsAtPath:kernelcachePath]) {
             return kernelcachePath;
@@ -593,11 +621,66 @@ int reboot3(uint64_t flags, ...);
         [[DOUIManager sharedInstance] sendLog:@"Downloading Kernel" debug:NO];
         NSString *kernelcachePath = [NSHomeDirectory() stringByAppendingPathComponent:@"Documents/kernelcache"];
         if (![[NSFileManager defaultManager] fileExistsAtPath:kernelcachePath]) {
-            if (grab_kernelcache(kernelcachePath) == false) return nil;
+            if (grab_images([NSHomeDirectory() stringByAppendingPathComponent:@"Documents"]) == false) return nil;
         }
         return kernelcachePath;
     }
 }
+
+- (NSString *)accessibleSPTMPath
+{
+    NSString *sptmInAppPath = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"sptm.img4"];
+    if ([[NSFileManager defaultManager] fileExistsAtPath:sptmInAppPath]) {
+        return sptmInAppPath;
+    }
+    
+    NSString *sptmInDocsPath = [NSHomeDirectory() stringByAppendingPathComponent:@"Documents/sptm.img4"];
+    if ([[NSFileManager defaultManager] fileExistsAtPath:sptmInDocsPath]) {
+        return sptmInDocsPath;
+    }
+    
+    sptmInDocsPath = [NSHomeDirectory() stringByAppendingPathComponent:@"Documents/sptm.im4p"];
+    if ([[NSFileManager defaultManager] fileExistsAtPath:sptmInDocsPath]) {
+        return sptmInDocsPath;
+    }
+
+    if ([self isInstalledThroughTrollStore] || getuid() == 0) {
+        NSString *sptmPath = [[self activePrebootPath] stringByAppendingPathComponent:@"/usr/standalone/firmware/FUD/Ap,SecurePageTableMonitor.img4"];
+        if ([[NSFileManager defaultManager] fileExistsAtPath:sptmPath]) {
+            return sptmPath;
+        }
+    }
+
+    return nil;
+}
+
+- (NSString *)accessibleTXMPath
+{
+    NSString *txmInAppPath = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"txm.img4"];
+    if ([[NSFileManager defaultManager] fileExistsAtPath:txmInAppPath]) {
+        return txmInAppPath;
+    }
+    
+    NSString *txmInDocsPath = [NSHomeDirectory() stringByAppendingPathComponent:@"Documents/txm.img4"];
+    if ([[NSFileManager defaultManager] fileExistsAtPath:txmInDocsPath]) {
+        return txmInDocsPath;
+    }
+    
+    txmInDocsPath = [NSHomeDirectory() stringByAppendingPathComponent:@"Documents/txm.im4p"];
+    if ([[NSFileManager defaultManager] fileExistsAtPath:txmInDocsPath]) {
+        return txmInDocsPath;
+    }
+
+    if ([self isInstalledThroughTrollStore] || getuid() == 0) {
+        NSString *txmPath = [[self activePrebootPath] stringByAppendingPathComponent:@"/usr/standalone/firmware/FUD/Ap,TrustedExecutionMonitor.img4"];
+        if ([[NSFileManager defaultManager] fileExistsAtPath:txmPath]) {
+            return txmPath;
+        }
+    }
+
+    return nil;
+}
+
 
 - (BOOL)isPACBypassRequired
 {
@@ -716,7 +799,7 @@ int reboot3(uint64_t flags, ...);
         UIImage *bootLogoImage;
 
         if ([[DOPreferenceManager sharedManager] boolPreferenceValueForKey:@"customBootlogoEnabled" fallback:NO]) {
-            bootLogoImage = [UIImage imageWithContentsOfFile:[DOUIManager sharedInstance].bootlogoPath];
+            bootLogoImage = [NSClassFromString(@"UIImage") imageWithContentsOfFile:[DOUIManager sharedInstance].bootlogoPath];
         }
 
         if (!bootLogoImage) {

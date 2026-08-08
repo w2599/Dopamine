@@ -24,12 +24,33 @@ int ptrace(int request, pid_t pid, caddr_t addr, int data);
 #define PT_ATTACH       10      /* trace some running process */
 #define PT_ATTACHEXC    14      /* attach to running process with signal exception */
 
+extern kern_return_t mach_vm_protect(vm_map_t target_task, mach_vm_address_t address, mach_vm_size_t size, boolean_t set_maximum, vm_prot_t new_protection);
+extern kern_return_t _kernelrpc_mach_vm_protect_trap(mach_port_name_t target, mach_vm_address_t address, mach_vm_size_t size, boolean_t set_maximum, vm_prot_t new_protection);
+extern kern_return_t _kernelrpc_mach_vm_protect(vm_map_t target_task, mach_vm_address_t address, mach_vm_size_t size, boolean_t set_maximum, vm_prot_t new_protection);
+extern kern_return_t mach_vm_region_recurse(vm_map_read_t target_task, mach_vm_address_t *address, mach_vm_size_t *size, natural_t *nesting_depth, vm_region_recurse_info_t info, mach_msg_type_number_t *infoCnt);
+
 #define POSIX_SPAWN_PROC_TYPE_DRIVER 0x700
 int posix_spawnattr_getprocesstype_np(const posix_spawnattr_t * __restrict, int * __restrict) __API_AVAILABLE(macos(10.8), ios(6.0));
 
 #define POSIX_SPAWNATTR_OFF_MEMLIMIT_ACTIVE 0x48
 #define POSIX_SPAWNATTR_OFF_MEMLIMIT_INACTIVE 0x4C
 #define POSIX_SPAWNATTR_OFF_LAUNCH_TYPE 0xA8
+
+#define POSIX_SPAWN_POSIX_CRED_UID          0x00010000
+#define POSIX_SPAWN_POSIX_CRED_GID          0x00020000
+#define POSIX_SPAWN_PERSONA_UID             POSIX_SPAWN_POSIX_CRED_UID
+#define POSIX_SPAWN_PERSONA_GID             POSIX_SPAWN_POSIX_CRED_GID
+#define POSIX_SPAWN_PERSONA_FLAGS_OVERRIDE 1
+#define POSIX_SPAWNATTR_OFF_PERSONA 0xD8
+struct _posix_spawn_persona_info {
+	uid_t    pspi_id;       /* persona ID (unix UID) */
+	uint32_t pspi_flags;    /* spawn persona flags */
+	uid_t    pspi_uid;      /* alternate posix/unix UID  */
+	gid_t    pspi_gid;      /* alternate posix/unix GID */
+	uint32_t pspi_ngroups;  /* alternate advisory groups */
+	gid_t    pspi_groups[NGROUPS];
+	uid_t    pspi_gmuid;    /* group membership UID */
+};
 
 extern char **environ;
 

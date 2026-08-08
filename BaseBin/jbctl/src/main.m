@@ -1,6 +1,7 @@
 #import <libjailbreak/libjailbreak.h>
 #import <libjailbreak/jbclient_xpc.h>
 #import <libjailbreak/jbclient_mach.h>
+#import <libjailbreak/stock_fixes.h>
 #import "internal.h"
 
 #import <Foundation/Foundation.h>
@@ -18,7 +19,7 @@ Available commands:\n\
 	trustcache info\t\t\tPrint info about all jailbreak related trustcaches and the cdhashes contained in them\n\
 	trustcache clear\t\tClears all existing cdhashes from the jailbreaks trustcache\n\
 	trustcache add <cdhash>\t\tAdd an arbitrary cdhash to the jailbreaks trustcache\n\
-	update <tipa/basebin> <path>\tInitiates a jailbreak update either based on a TIPA or based on a basebin.tar file, TIPA installation depends on TrollStore, afterwards it triggers a userspace reboot\n");
+	update <tipa/basebin/tarball> <path>\tInitiates a jailbreak update either based on a TIPA, based on a basebin.tar file or based on a standalone tarball, TIPA installation depends on TrollStore, afterwards it triggers a userspace reboot\n");
 }
 
 int main(int argc, char* argv[])
@@ -129,7 +130,15 @@ int main(int argc, char* argv[])
 		}
 	}
 	else if (!strcmp(cmd, "reboot_userspace")) {
+		usleep(10000);
 		return reboot3(RB2_USERREBOOT);
+	}
+	else if (!strcmp(cmd, "respring")) {
+		usleep(10000);
+		const char *sbreloadPath = JBROOT_PATH("/usr/bin/sbreload");
+		if (execve(sbreloadPath, (char *[]){ (char *)sbreloadPath, NULL }, environ) != 0) {
+			killall("/usr/libexec/backboardd", SIGTERM);
+		}
 	}
 	else if (!strcmp(cmd, "update")) {
 		if (argc < 4) {
@@ -166,8 +175,19 @@ int main(int argc, char* argv[])
 			updateFile = strdup([dopamineAppProxy.bundleURL.path stringByAppendingPathComponent:@"basebin.tar"].fileSystemRepresentation);
 			// Fall through to basebin installation
 		}
+		else if (!strcmp(updateType, "tarball")) {
+			NSString *tmpPath = [@"/tmp" stringByAppendingPathComponent:[NSUUID UUID].UUIDString];
+			[[NSFileManager defaultManager] createDirectoryAtPath:tmpPath withIntermediateDirectories:NO attributes:nil error:nil];
+			int r = libarchive_unarchive(updateFile, tmpPath.fileSystemRepresentation);
+			if (r != 0) {
+				printf("Failed to extract tarball: %d\n", r);
+				return 7;
+			}
+			updateFile = strdup([tmpPath stringByAppendingPathComponent:@"basebin.tar"].fileSystemRepresentation);
+			// Fall through to basebin installation
+		}
 		else if (strcmp(updateType, "basebin") != 0) {
-			// If type is neither tipa nor basebin, bail out
+			// If type is not tipa, tarball or basebin, bail out
 			print_usage();
 			return 2;
 		}

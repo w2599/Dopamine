@@ -154,11 +154,24 @@ class RelocInfo {
                     // This is what we want
                     let off  = Int(sect.address) - Int(s!.origCommand.vmAddr)
                     let size = Int(sect.size)
-                    let data = s!.data.subdata(in: off..<(off + size))
                     
+                    // Zero-fill sections have no file data; return empty
+                    let sectionType = sect.flags.rawValue & 0xFF
+                    if sectionType == 0x1 /* S_ZEROFILL */ || sectionType == 0xC /* S_GB_ZEROFILL */ {
+                        return (Data(count: size), sect.address, sect.address &+ s!.offset)
+                    }
+                    
+                    // Also guard against off-disk BSS-like sections
+                    guard off + size <= s!.data.count else {
+                        // Clamp to what's on disk, pad the rest
+                        let available = max(0, s!.data.count - off)
+                        let fileData = available > 0 ? s!.data.subdata(in: off..<(off + available)) : Data()
+                        return (fileData + Data(count: size - available), sect.address, sect.address &+ s!.offset)
+                    }
+                    
+                    let data = s!.data.subdata(in: off..<(off + size))
                     return (data, sect.address, sect.address &+ s!.offset)
                 }
-                
                 currentIndex += 1
             }
         }

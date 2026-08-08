@@ -13,28 +13,38 @@ NS_ASSUME_NONNULL_BEGIN
 @interface DOEnvironmentManager : NSObject
 {
     DOBootstrapper *_bootstrapper;
+    BOOL _isJailbroken;
+    NSString *_jailbrokenVersion;
     BOOL _bootstrapNeedsMigration;
 }
 
 + (instancetype)sharedManager;
 
-@property (nonatomic, readonly) NSData *bootManifestHash;
-
 - (NSString *)appVersion;
 - (NSString *)appVersionDisplayString;
 - (NSString *)nightlyHash;
 
+- (NSString *)privatePrebootPath;
+- (NSString *)activePrebootPath;
+
 - (BOOL)isInstalledThroughTrollStore;
 - (BOOL)isJailbroken;
+- (BOOL)isJailbrokenWithOtherJailbreak;
 - (BOOL)isBootstrapped;
 - (NSString *)jailbrokenVersion;
+- (NSString *)systemVersion;
 
 - (BOOL)isSupported;
 - (BOOL)isArm64e;
+- (BOOL)isSPTM;
 - (NSString *)versionSupportString;
 - (NSString *)accessibleKernelPath;
+- (NSString *)accessibleSPTMPath;
+- (NSString *)accessibleTXMPath;
 - (void)locateJailbreakRoot;
 - (NSError *)ensureJailbreakRootExists;
+
+- (void)setJailbroken:(BOOL)jailbroken;
 
 
 - (void)runUnsandboxed:(void (^)(void))unsandboxBlock;

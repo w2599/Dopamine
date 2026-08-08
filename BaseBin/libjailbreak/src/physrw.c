@@ -22,7 +22,8 @@ void *physrw_phystouaddr(uint64_t pa)
 		}
 	}
 
-	return (void *)(pa + PPLRW_USER_MAPPING_OFFSET);
+	uint64_t paUaStartOffset = kconstant(physBase) & ~(arm_tt_level[1].indexMask | (arm_tt_level[1].indexMask - 1));
+	return (void *)((pa - paUaStartOffset) + PPLRW_USER_MAPPING_OFFSET);
 }
 
 void *physrw_kvtouaddr(uint64_t va)
@@ -57,6 +58,14 @@ int physrw_physwritebuf(uint64_t pa, const void* input, size_t size)
 	return 0;
 }
 
+int physrw_physaccess_mapped(uint64_t pa, uint64_t size, kernel_map_accessor accessorBlock)
+{
+	void *ptr = physrw_phystouaddr(pa);
+	if (!ptr) return -1;
+	accessorBlock(ptr);
+	return 0;
+}
+
 int physrw_handoff(pid_t pid)
 {
 	if (!pid) return -1;
@@ -75,8 +84,15 @@ int physrw_handoff(pid_t pid)
 		uint64_t pmap = kread_ptr(vmMap + koffsetof(vm_map, pmap));
 		if (!pmap) { ret = -5; break; };
 
+		// In iOS 26+ on SPTM devices, physBase is higher than what can be mapped into userspace processes
+		// E.g. gPhysBase is 0x10002458000 but userspace level 1 pages only have 8 entries so only cover an address space from 0x0 to 0x8000000000
+		// In order to fix this, we need to mask out any part of the address that can't be reflected in the userspace process
+		// In the example this would be 0x10000000000
+		// We substract (gPaUaStartOffset) this both here and in physrw_phystouaddr to fix this problem
+		uint64_t paUaStartOffset = kconstant(physBase) & ~(arm_tt_level[1].indexMask | (arm_tt_level[1].indexMask - 1));
+
 		// Map the entire kernel physical address space into the userland process, starting at PPLRW_USER_MAPPING_OFFSET
-		int mapInRet = pmap_map_in(pmap, kconstant(physBase)+PPLRW_USER_MAPPING_OFFSET, kconstant(physBase), kconstant(physSize));
+		int mapInRet = pmap_map_in(pmap, kconstant(physBase) - paUaStartOffset + PPLRW_USER_MAPPING_OFFSET, kconstant(physBase), kconstant(physSize));
 		if (mapInRet != 0) ret = -10 + mapInRet;
 	} while (0);
 
@@ -86,13 +102,16 @@ int physrw_handoff(pid_t pid)
 
 int libjailbreak_physrw_init(bool receivedHandoff)
 {
+	int r = 0;
 	if (!receivedHandoff) {
-		physrw_handoff(getpid());
+		r = physrw_handoff(getpid());
+		if (r != 0) return r;
 	}
 	gPrimitives.physreadbuf = physrw_physreadbuf;
 	gPrimitives.physwritebuf = physrw_physwritebuf;
+	gPrimitives.physaccess_mapped = physrw_physaccess_mapped;
 	gPrimitives.kreadbuf = NULL;
 	gPrimitives.kwritebuf = NULL;
 
-	return 0;
+	return r;
 }

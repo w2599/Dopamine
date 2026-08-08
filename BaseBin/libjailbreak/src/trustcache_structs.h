@@ -4,9 +4,7 @@
 #include <uuid/uuid.h>
 #include <choma/CSBlob.h>
 #include <stdint.h>
-
-// TODO: Move to ChOma?
-#define CS_CDHASH_LEN 20
+#include "signatures.h"
 
 typedef uint8_t cdhash_t[CS_CDHASH_LEN];
 

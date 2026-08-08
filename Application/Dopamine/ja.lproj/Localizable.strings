@@ -30,7 +30,7 @@
 
 // Removed Jailbreak Alert
 "Removed_Jailbreak_Alert_Title" = "Jailbreak環境は削除されました";
-"Removed_Jailbreak_Alert_Message" = "Jailbreak環境の削除に成功しました. デバイスの再起動をお勧めします。";
+"Removed_Jailbreak_Alert_Message" = "Jailbreak環境の削除に成功しました. デバイスの再起動をおすすめします。";
 "Button_Close" = "閉じる";
 
 // Error View
@@ -40,8 +40,9 @@
 // Settings Toggles
 "Settings_Tweak_Injection" = "Tweak Injection";
 "Settings_iDownload" = "iDownload (開発者用シェル)";
-"Settings_Verbose_Logs" = "詳細なログ";
-/*Settings_Apps_JIT*/
+"Settings_Verbose_Logs" = "詳細ログ";
+"Settings_Apps_JIT" = "アプリでのJITを有効";
+"Settings_Jetsam_Multiplier" = "Jetsam倍率";
 
 // Settings Buttons
 "Button_Remove_Jailbreak" = "Jailbreak環境の削除";
@@ -49,7 +50,7 @@
 "Button_Unhide_Jailbreak" = "Jailbreak環境を戻す";
 "Button_Refresh_Jailbreak_Apps" = "Jailbreakアプリを更新 (UICache)";
 "Button_Reinstall_Package_Managers" = "パッケージマネージャーを再インストール";
-/*Button_Change_Mobile_Password*/
+"Button_Change_Mobile_Password" = "\"mobile\"のパスワードを変更";
 
 // Settings Hints
 "Hint_Hide_Jailbreak" = "\"Jailbreakを隠す\"は、次のjailbreakの実行までjailbreak関連のファイルを一時的に隠します";
@@ -58,6 +59,11 @@
 "Section_Actions" = "Actions";
 "Section_Customization" = "Customization";
 "Section_Exploits" = "Exploits";
+"Section_Boot_Logo" = "Boot Logo";
+"Jetsam_Description" = "Jetsamは、メモリ使用量が指定された上限を超えたプロセスを自動的に終了させるシステム機能です。多数のTweakをインストールしている場合、プロセスが起動直後にこの上限を超えてしまい、クラッシュループ状態に陥ることがあります。ここでは、メモリ上限が設定されたすべてのプロセスに適用する倍率を選択できます。多数のTweakを導入した際にクラッシュループが発生したり、システムの動作が不安定になったりする場合は、この倍率を上げてください。システム全体のメモリ使用量への影響を最小限に抑えるため、システムが安定して動作する範囲内で、できる限り低い倍率を選択することをおすすめします。";
+"Enabled" = "有効";
+"Custom_Boot_Logo" = "Custom Boot Logo";
+"Select_Image" = "イメージを選択";
 
 // Settings Alerts
 "Alert_Tweak_Injection_Toggled_Title" = "Userspaceの再起動が必要です";
@@ -67,13 +73,13 @@
 "Alert_Remove_Jailbreak_Title" = "Jailbreak環境を削除";
 "Alert_Remove_Jailbreak_Pressed_Body" = "Jailbreak環境を削除すると、jailbreak関連のファイルはすべて削除されますが、通常のアプリケーション、ファイル、データはすべて保持されます。本当に続けてもよろしいですか？この操作を元に戻すことはできません。";
 "Alert_Remove_Jailbreak_Enabled_Body" = "\"Jailbreak環境を削除\"を有効にすると、次回のjailbreak実行時にjailbreak関連ファイルはすべて削除されますが、通常のアプリ、ファイル、データはすべて保持されます。本当に続けてもよろしいですか？この操作を元に戻すことはできません。";
-/*Alert_Change_Mobile_Password_Body*/
-/*Password_Placeholder*/
-/*Repeat_Password_Placeholder*/
-/*Password_Auth_Required*/
-/*Button_Change*/
+"Alert_Change_Mobile_Password_Body" = "デバイスの\"mobile\"ユーザーのパスワードを設定します。このパスワードは、sudoを使用したroot権限での操作にも利用できます。rootのパスワードを設定する場合は、mobileユーザーのシェルで\"sudo passwd root\"コマンドを実行してください。";
+"Password_Placeholder" = "パスワードを入力";
+"Repeat_Password_Placeholder" = "パスワードを再入力";
+"Password_Auth_Required" = "mobileユーザーのパスワードを変更するには認証が必要です。";
+"Button_Change" = "変更";
 "Button_Cancel" = "キャンセル";
-"Button_Continue" = "続ける";
+"Button_Continue" = "続行";
 
 // Duplicate Apps Errors
 "Duplicate_Apps_Error_Dopamine_App" = "バンドルID \"%@\" を持つアプリケーションはDopamine用アプリケーションディレクトリ(\"%@\")内に複数存在しています。この作業を続行できません。";
@@ -84,9 +90,16 @@
 "Theme" = "テーマ";
 "Kernel Exploit" = "Kernel Exploit";
 "PPL Bypass" = "PPL Bypass";
+"SPTM Bypass" = "SPTM Bypass";
 "PAC Bypass" = "PAC Bypass";
-/*None*/
-/*Recommended*/
+"None" = "None";
+"Recommended" = "推奨";
+
+// DarkSword Workaround
+/*Respring_Required*/
+/*Respring_Required_Message*/
+/*Respring_Required_Notice_A8*/
+/*Apply_Workaround*/
 
 // Credits
 "Credits_Button_Discord" = "Discord";
@@ -95,7 +108,7 @@
 
 // Logs
 "Initializing Environment" = "Initializing Jailbreak Environment";
-/*Initializing Protection*/
+"Initializing Protection" = "Initializing Protection";
 "Loading BaseBin TrustCache" = "Loading BaseBin TrustCache";
 "Applying Bind Mount" = "Applying Bind Mount";
 "Removing Jailbreak" = "Removing Jailbreak";
@@ -107,9 +120,10 @@
 "Exploiting Kernel (%@)" = "Exploiting Kernel (%@)";
 "Bypassing PAC (%@)" = "Bypassing PAC (%@)";
 "Bypassing PPL (%@)" = "Bypassing PPL (%@)";
+"Bypassing SPTM (%@)" = "Bypassing SPTM (%@)";
 
 // Package Manager selection
 "Status_Title_Select_Package_Managers" = "パッケージマネージャーを選択";
-"Select_Package_Managers_Install_Message" = "どちらを選択するか迷った場合は、Sileoを選択してください";
-"Continue" = "続ける";
+"Select_Package_Managers_Install_Message" = "どちらを選択するか迷った場合は、Sileoを選択することをおすすめします。";
+"Continue" = "続行";
 

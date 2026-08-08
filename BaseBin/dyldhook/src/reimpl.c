@@ -4,6 +4,30 @@
 #include <sandbox.h>
 #include <limits.h>
 #include <mach/mach.h>
+#include <mach/mach_param.h>
+
+struct NDR_record_t
+{
+	uint8_t mig_vers;
+	uint8_t if_vers;
+	uint8_t reserved1;
+	uint8_t mig_encoding;
+	uint8_t int_rep;
+	uint8_t char_rep;
+    uint8_t float_rep;
+    uint8_t reserved2;
+};
+
+NDR_record_t NDR_record = {
+	.mig_vers = 0,
+	.if_vers = 0,
+	.reserved1 = 0,
+	.mig_encoding = 0,
+	.int_rep = 1,
+	.char_rep = 0,
+	.float_rep = 0,
+	.reserved2 = 0,
+};
 
 #include "dyld.h"
 
@@ -42,50 +66,7 @@ int64_t sandbox_extension_consume(const char *extension_token)
 	}
 }
 
-// mig_get_reply_port has to be reimplemented because the implementation inside dyld accesses TPIDRRO_EL0 (which is NULL when the dyldhook code runs)
-// We make the reimplementation store it in a global instead, which is enough since we will only be calling it from one thread anyways
-// gMigReplyPort will be invalid after the process forks, so we need to make sure to only use that during the process initialization
-// That's why after TPIDRRO_EL0 has been initialized, we will simply use dyld's mig_get_reply_port again, since TPIDRRO_EL0 should be initialized the next time it's called
-
-uint64_t __attribute((noinline, naked)) get_tpidrro_el0(void)
-{
-	__asm("mrs x0, TPIDRRO_EL0");
-	__asm("ret");
-}
-
-mach_port_t gMigReplyPort = 0;
-mach_port_t dyld_mig_get_reply_port(void);
-
-#if IOS == 15
-extern mach_port_t mach_reply_port(void);
-
-mach_port_t mig_get_reply_port(void) {
-	if (get_tpidrro_el0() == 0) {
-		if (!gMigReplyPort) {
-			gMigReplyPort = mach_reply_port();
-		}
-		return gMigReplyPort;
-	}
-
-	return dyld_mig_get_reply_port();
-}
-#else // iOS 16+
-
-struct mach_port_options gMigOptions = {
-	.flags = 0x1000,
-};
-
-mach_port_t mig_get_reply_port(void) {
-	if (get_tpidrro_el0() == 0) {
-		if (!gMigReplyPort) {
-			struct mach_port_options options = gMigOptions;
-			mach_port_construct(task_self_trap(), &options, 0, &gMigReplyPort);
-		}
-		return gMigReplyPort;
-	}
-
-	return dyld_mig_get_reply_port();
-}
+#if IOS >= 16
 
 // iOS 16+ dyld's do no longer have mach_msg, reimplement it
 // We also need to reimplement mach_msg2, since task.c needs it
@@ -137,28 +118,8 @@ __options_decl(mach_msg_option64_t, uint64_t, {
 	MACH64_SEND_MQ_CALL                    = 0x0000000400000000ull,
 	/* This message destination is unknown. Used by old simulators only. */
 	MACH64_SEND_ANY                        = 0x0000000800000000ull,
-
-#ifdef XNU_KERNEL_PRIVATE
-	/*
-	 * If kmsg has auxiliary data, append it immediate after the message
-	 * and trailer.
-	 *
-	 * Must be used in conjunction with MACH64_MSG_VECTOR
-	 */
-	MACH64_RCV_LINEAR_VECTOR               = 0x1000000000000000ull,
-	/* Receive into highest addr of buffer */
-	MACH64_RCV_STACK                       = 0x2000000000000000ull,
-	/*
-	 * This internal-only flag is intended for use by a single thread per-port/set!
-	 * If more than one thread attempts to MACH64_PEEK_MSG on a port or set, one of
-	 * the threads may miss messages (in fact, it may never wake up).
-	 */
-	MACH64_PEEK_MSG                        = 0x4000000000000000ull,
-	/*
-	 * This is a mach_msg2() send/receive operation.
-	 */
-	MACH64_MACH_MSG2                       = 0x8000000000000000ull
-#endif
+	/* This message is a DriverKit call */
+	MACH64_SEND_DK_CALL                    = 0x0000001000000000ull,
 });
 
 mach_msg_return_t
@@ -220,6 +181,40 @@ mach_msg_return_t mach_msg2(
 kern_return_t mach_msg(mach_msg_header_t *msg, mach_msg_option_t option, mach_msg_size_t send_size, mach_msg_size_t rcv_size, mach_port_name_t rcv_name, mach_msg_timeout_t timeout, mach_port_name_t notify)
 {
 	return mach_msg_overwrite(msg, option, send_size, rcv_size, rcv_name, timeout, notify, NULL, 0);
+}
+
+#endif
+
+#if IOS >= 18
+
+kern_return_t _kernelrpc_mach_ports_lookup3(task_t target_task, mach_port_t *port1, mach_port_t *port2, mach_port_t *port3);
+
+kern_return_t
+mach_ports_lookup(
+	task_t                  target_task,
+	mach_port_array_t      *init_port_set,
+	mach_msg_type_number_t *init_port_setCnt)
+{
+	vm_size_t size = TASK_PORT_REGISTER_MAX * sizeof(mach_port_t);
+	mach_port_array_t array;
+	vm_address_t addr = 0;
+	kern_return_t kr;
+
+	kr = vm_allocate(mach_task_self(), &addr, size, VM_FLAGS_ANYWHERE);
+	array = (mach_port_array_t)addr;
+	if (kr != KERN_SUCCESS) {
+		return kr;
+	}
+
+	kr = _kernelrpc_mach_ports_lookup3(target_task, &array[0], &array[1], &array[2]);
+	if (kr != KERN_SUCCESS) {
+		vm_deallocate(mach_task_self(), addr, size);
+		return kr;
+	}
+
+	*init_port_set = array;
+	*init_port_setCnt = TASK_PORT_REGISTER_MAX;
+	return KERN_SUCCESS;
 }
 
 #endif

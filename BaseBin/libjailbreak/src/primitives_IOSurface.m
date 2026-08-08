@@ -21,27 +21,41 @@ uint64_t IOSurfaceClient_get_surface(uint64_t surfaceClient)
 
 uint64_t IOSurfaceSendRight_get_surface(uint64_t surfaceSendRight)
 {
-	return kread_ptr(surfaceSendRight + 0x18);	
+	if (gPrimitives.krwMinSafeReadSize > 0x8) {
+		uint32_t zoneSize = 0x30;
+		uint64_t readOffset = zoneSize - gPrimitives.krwMinSafeReadSize;
+
+		uint8_t buf[gPrimitives.krwMinSafeReadSize];
+		kreadbuf(surfaceSendRight + readOffset, &buf[0], gPrimitives.krwMinSafeReadSize);
+		return UNSIGN_PTR(*(uint64_t *)(&buf[0x18 - readOffset]));
+	} else {
+		return kread_ptr(surfaceSendRight + 0x18);
+	}
 }
 
 uint64_t IOSurface_get_ranges(uint64_t surface)
 {
-	return kread_ptr(surface + 0x3e0);
+	return kread_ptr(surface + koffsetof(IOSurface, ranges));
 }
 
 void IOSurface_set_ranges(uint64_t surface, uint64_t ranges)
 {
-	kwrite64(surface + 0x3e0, ranges);
+	kwrite64(surface + koffsetof(IOSurface, ranges), ranges);
 }
 
 uint64_t IOSurface_get_memoryDescriptor(uint64_t surface)
 {
-	return kread_ptr(surface + 0x38);
+	return kread_ptr(surface + koffsetof(IOSurface, memoryDescriptor));
 }
 
 uint64_t IOMemoryDescriptor_get_ranges(uint64_t memoryDescriptor)
 {
 	return kread_ptr(memoryDescriptor + 0x60);
+}
+
+uint64_t IOMemoryDescriptor_set_ranges(uint64_t memoryDescriptor, uint64_t ranges)
+{
+	return kwrite64(memoryDescriptor + 0x60, ranges);
 }
 
 uint64_t IOMemorydescriptor_get_size(uint64_t memoryDescriptor)
@@ -76,21 +90,50 @@ void IOMemoryDescriptor_set_memRef(uint64_t memoryDescriptor, uint64_t memRef)
 
 uint64_t IOSurface_get_rangeCount(uint64_t surface)
 {
-	return kread_ptr(surface + 0x3e8);
+	return kread_ptr(surface + koffsetof(IOSurface, rangeCount));
 }
 
 void IOSurface_set_rangeCount(uint64_t surface, uint32_t rangeCount)
 {
-	kwrite32(surface + 0x3e8, rangeCount);
+	kwrite32(surface + koffsetof(IOSurface, rangeCount), rangeCount);
 }
 
-static mach_port_t IOSurface_map_getSurfacePort(uint64_t magic)
+uint64_t IOSurface_port_getSendRight(mach_port_t surfaceMachPort)
 {
-	IOSurfaceRef surfaceRef = IOSurfaceCreate((__bridge CFDictionaryRef)@{
-		(__bridge NSString *)kIOSurfaceWidth : @120,
-		(__bridge NSString *)kIOSurfaceHeight : @120,
-		(__bridge NSString *)kIOSurfaceBytesPerElement : @4,
-	});
+	uint64_t surfaceSendRight = task_get_ipc_port_kobject(task_self(), surfaceMachPort);
+	if (koffsetof(IOMachPort, object)) {
+		if (gPrimitives.krwMinSafeReadSize > 0x8) {
+			uint32_t zoneSize = koffsetof(IOMachPort, object) + 0x8; // object is the last field in IOMachPort
+			uint64_t readOffset = zoneSize - gPrimitives.krwMinSafeReadSize;
+
+			uint8_t buf[gPrimitives.krwMinSafeReadSize];
+			kreadbuf(surfaceSendRight + readOffset, &buf[0], gPrimitives.krwMinSafeReadSize);
+			surfaceSendRight = UNSIGN_PTR(*(uint64_t *)(&buf[gPrimitives.krwMinSafeReadSize - 0x8]));
+		} else {
+			surfaceSendRight = kread_ptr(surfaceSendRight + koffsetof(IOMachPort, object));
+		}
+	}
+	return surfaceSendRight;
+}
+
+static mach_port_t IOSurface_map_getSurfacePort(uint64_t magic, uint32_t cacheMode)
+{
+	IOSurfaceRef surfaceRef = NULL;
+	if (cacheMode != 0) {
+		surfaceRef = IOSurfaceCreate((__bridge CFDictionaryRef)@{
+			(__bridge NSString *)kIOSurfaceWidth : @120,
+			(__bridge NSString *)kIOSurfaceHeight : @120,
+			(__bridge NSString *)kIOSurfaceBytesPerElement : @4,
+			(__bridge NSString *)kIOSurfaceCacheMode : @(cacheMode),
+		});
+	} else {
+		surfaceRef = IOSurfaceCreate((__bridge CFDictionaryRef)@{
+			(__bridge NSString *)kIOSurfaceWidth : @120,
+			(__bridge NSString *)kIOSurfaceHeight : @120,
+			(__bridge NSString *)kIOSurfaceBytesPerElement : @4,
+		});
+	}
+
 	mach_port_t port = IOSurfaceCreateMachPort(surfaceRef);
 	*((uint64_t *)IOSurfaceGetBaseAddress(surfaceRef)) = magic;
 	IOSurfaceDecrementUseCount(surfaceRef);
@@ -98,17 +141,42 @@ static mach_port_t IOSurface_map_getSurfacePort(uint64_t magic)
 	return port;
 }
 
-int IOSurface_map(uint64_t pa, uint64_t size, void **uaddr)
-{
-	mach_port_t surfaceMachPort = IOSurface_map_getSurfacePort(1337);
+struct IOSurface_toCleanup {
+	uint64_t descriptor;
+	uint64_t origRanges;
+	uint64_t *fakeRangesUA;
+};
 
-	uint64_t surfaceSendRight = task_get_ipc_port_kobject(task_self(), surfaceMachPort);
+struct IOSurface_toCleanup *cleanups = NULL;
+unsigned cleanupsCount = 0;
+
+int IOSurface_map_withCacheMode(uint64_t pa, uint64_t size, void **uaddr, uint32_t cacheMode)
+{
+	mach_port_t surfaceMachPort = IOSurface_map_getSurfacePort(1337, cacheMode);
+
+	uint64_t surfaceSendRight = IOSurface_port_getSendRight(surfaceMachPort);
 	uint64_t surface = IOSurfaceSendRight_get_surface(surfaceSendRight);
 	uint64_t desc = IOSurface_get_memoryDescriptor(surface);
 	uint64_t ranges = IOMemoryDescriptor_get_ranges(desc);
 
-	kwrite64(ranges, pa);
-	kwrite64(ranges+8, size);
+	if (gPrimitives.krwMinSafeReadSize > 0x10) {
+		// If the primitive we have cannot read <=0x10 bytes at a time, we need to create our own struct
+		// And later clean it up when we have a better primitive in IOSurface_map_cleanup
+		uint64_t *fakeRanges = malloc(2 * sizeof(uint64_t));
+		fakeRanges[0] = pa;
+		fakeRanges[1] = size;
+
+		uint64_t fakeRanges_kva = phystokv(vtophys(ttep_self(), (uint64_t)fakeRanges));
+		IOMemoryDescriptor_set_ranges(desc, fakeRanges_kva);
+		cleanups = realloc(cleanups, ++cleanupsCount * sizeof(struct IOSurface_toCleanup));
+		cleanups[cleanupsCount-1].descriptor = desc;
+		cleanups[cleanupsCount-1].origRanges = ranges;
+		cleanups[cleanupsCount-1].fakeRangesUA = fakeRanges;
+	}
+	else {
+		kwrite64(ranges, pa);
+		kwrite64(ranges+8, size);
+	}
 
 	IOMemoryDescriptor_set_size(desc, size);
 
@@ -128,7 +196,95 @@ int IOSurface_map(uint64_t pa, uint64_t size, void **uaddr)
 	return 0;
 }
 
-static mach_port_t IOSurface_kalloc_getSurfacePort(uint64_t size)
+int IOSurface_map(uint64_t pa, uint64_t size, void **uaddr) {
+	return IOSurface_map_withCacheMode(pa, size, uaddr, 0);
+}
+
+void IOSurface_map_cleanup(void)
+{
+	if (cleanupsCount == 0) return;
+
+	for (unsigned i = 0; i < cleanupsCount; i++) {
+		uint64_t desc = cleanups[i].descriptor;
+		uint64_t origRanges = cleanups[i].origRanges;
+		uint64_t *fakeRangesUA = cleanups[i].fakeRangesUA;
+
+		IOMemoryDescriptor_set_ranges(desc, origRanges);
+		free(fakeRangesUA);
+	}
+
+	free(cleanups);
+	cleanups = NULL;
+	cleanupsCount = 0;
+}
+
+static CFNumberRef CFNUM64(uint64_t value) {
+    return CFNumberCreate(NULL, kCFNumberSInt64Type, (void *)&value);
+}
+
+static mach_port_t IOSurface_kalloc_getSurfacePort_16up(uint64_t size) {
+	uint64_t rangesAlignedSize = ((size + 0xf) & ~0xf);
+
+	static vm_size_t dummyPageSize = 0x4000;
+	static vm_address_t dummyPage = 0;
+	if (dummyPage == 0) {
+		vm_allocate(mach_task_self(), &dummyPage, dummyPageSize, VM_FLAGS_ANYWHERE);
+	}
+
+	uint64_t *userspaceRanges = malloc(rangesAlignedSize);
+	for (int i = 0; i < (rangesAlignedSize / sizeof(uint64_t)); i += 2) {
+		userspaceRanges[i] = dummyPage;
+		userspaceRanges[i+1] = dummyPageSize;
+	}
+
+    CFDataRef userspaceRangesData = CFDataCreate(kCFAllocatorDefault, (const UInt8 *)userspaceRanges, rangesAlignedSize);
+    free(userspaceRanges);
+
+    CFMutableDictionaryRef dict = CFDictionaryCreateMutable(NULL, 0, NULL, NULL);
+	CFNumberRef dummyPageSizeNum = CFNUM64(dummyPageSize);
+    CFDictionarySetValue(dict, CFSTR("IOSurfaceAllocSize"),     (const void *)dummyPageSizeNum);
+    CFDictionarySetValue(dict, CFSTR("IOSurfaceAddressRanges"), (const void *)userspaceRangesData);
+
+    IOSurfaceRef surfaceRef = IOSurfaceCreate(dict);
+    mach_port_t port = IOSurfaceCreateMachPort(surfaceRef);
+    IOSurfaceDecrementUseCount(surfaceRef);
+
+	CFRelease(userspaceRangesData);
+	CFRelease(dummyPageSizeNum);
+	CFRelease(dict);
+
+    return port;
+}
+
+uint64_t IOSurface_kalloc_16up(uint64_t size, bool leak)
+{
+	if (size > 0x10000) return -1; // 0x10000 is max
+
+	while (true) {
+		mach_port_t surfaceMachPort = IOSurface_kalloc_getSurfacePort_16up(size);
+
+		uint64_t surfaceSendRight = IOSurface_port_getSendRight(surfaceMachPort);
+		uint64_t surface = IOSurfaceSendRight_get_surface(surfaceSendRight);
+		uint64_t va = IOSurface_get_ranges(surface);
+		uint64_t vaSize = IOSurface_get_rangeCount(surface) * 0x10;
+
+		if (vaSize < size) {
+			mach_port_deallocate(mach_task_self(), surfaceMachPort);
+			continue;
+		}
+
+		if (leak) {
+			IOSurface_set_ranges(surface, 0);
+			IOSurface_set_rangeCount(surface, 0);
+		}
+
+		return va;
+	}
+
+	return 0;
+}
+
+static mach_port_t IOSurface_kalloc_getSurfacePort_15(uint64_t size)
 {
 	uint64_t allocSize = 0x10;
 	uint64_t *addressRangesBuf = (uint64_t *)malloc(size);
@@ -147,11 +303,11 @@ static mach_port_t IOSurface_kalloc_getSurfacePort(uint64_t size)
 	return port;
 }
 
-uint64_t IOSurface_kalloc(uint64_t size, bool leak)
+uint64_t IOSurface_kalloc_15(uint64_t size, bool leak)
 {
 	while (true) {
 		uint64_t allocSize = max(size, 0x10000);
-		mach_port_t surfaceMachPort = IOSurface_kalloc_getSurfacePort(allocSize);
+		mach_port_t surfaceMachPort = IOSurface_kalloc_getSurfacePort_15(allocSize);
 
 		uint64_t surfaceSendRight = task_get_ipc_port_kobject(task_self(), surfaceMachPort);
 		uint64_t surface = IOSurfaceSendRight_get_surface(surfaceSendRight);
@@ -177,7 +333,14 @@ uint64_t IOSurface_kalloc(uint64_t size, bool leak)
 
 int IOSurface_kalloc_global(uint64_t *addr, uint64_t size)
 {
-	uint64_t alloc = IOSurface_kalloc(size, true);
+	uint64_t alloc = 0;
+	if (@available(iOS 16.0, *)) {
+		alloc = IOSurface_kalloc_16up(size, true);
+	}
+	else {
+		alloc = IOSurface_kalloc_15(size, true);
+	}
+
 	if (alloc != 0) {
 		*addr = alloc;
 		return 0;
@@ -187,7 +350,13 @@ int IOSurface_kalloc_global(uint64_t *addr, uint64_t size)
 
 int IOSurface_kalloc_local(uint64_t *addr, uint64_t size)
 {
-	uint64_t alloc = IOSurface_kalloc(size, false);
+	uint64_t alloc = 0;
+	if (@available(iOS 16.0, *)) {
+		alloc = IOSurface_kalloc_16up(size, false);
+	}
+	else {
+		alloc = IOSurface_kalloc_15(size, false);
+	}
 	if (alloc != 0) {
 		*addr = alloc;
 		return 0;
@@ -212,9 +381,6 @@ void libjailbreak_IOSurface_primitives_init(void)
 	CFRelease(surfaceRef);
 
 	gPrimitives.kmap = IOSurface_map;
-	if (@available(iOS 16.0, *)) {}
-	else {
-		gPrimitives.kalloc_global = IOSurface_kalloc_global;
-		gPrimitives.kalloc_local  = IOSurface_kalloc_local;
-	}
+	gPrimitives.kalloc_global = IOSurface_kalloc_global;
+	gPrimitives.kalloc_local  = IOSurface_kalloc_local;
 }

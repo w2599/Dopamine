@@ -19,10 +19,6 @@ int jb_trustcache_add_cdhashes(cdhash_t *hashes, uint32_t hashCount);
 xpc_object_t jb_trustcache_info(void);
 void jb_trustcache_clear(void);
 
-//int jb_trustcache_add_file(const char *filePath);
-//int jb_trustcache_add_directory(const char *directoryPath);
-//void jb_trustcache_rebuild(void);
-
 void jb_trustcache_debug_print(FILE *f);
 
 int trustcache_file_upload(trustcache_file_v1 *tc);

@@ -1,8 +1,6 @@
 #ifndef KCALL_ARM64_H
 #define KCALL_ARM64_H
 
-#ifndef __arm64e__
-
 #include <stdint.h>
 #include <stdbool.h>
 #include <mach/mach.h>
@@ -23,7 +21,5 @@ typedef struct {
 void arm64_kcall_return(void);
 
 int arm64_kcall_init(void);
-
-#endif
 
 #endif

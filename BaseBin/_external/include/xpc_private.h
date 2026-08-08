@@ -11,6 +11,11 @@ extern int xpc_pipe_routine_with_flags(xpc_object_t xpc_pipe, xpc_object_t inDic
 extern int xpc_pipe_routine_reply(xpc_object_t reply);
 extern int xpc_pipe_receive(mach_port_t port, XPC_GIVES_REFERENCE xpc_object_t *message);
 
+extern void xpc_dictionary_set_mach_recv(xpc_object_t dictionary, const char* name, mach_port_t port);
+extern mach_port_t xpc_dictionary_extract_mach_recv(xpc_object_t dictionary, const char* name);
+
 extern XPC_RETURNS_RETAINED xpc_object_t xpc_copy_entitlement_for_token(const char *, audit_token_t *);
+
+extern XPC_RETURNS_RETAINED xpc_object_t xpc_create_from_plist(const void *buf, size_t len);
 
 #endif

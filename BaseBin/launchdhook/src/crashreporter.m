@@ -13,6 +13,7 @@
 #include <sys/stat.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <mach-o/dyld.h>
+#include <libjailbreak/util.h>
 extern CFStringRef CFCopySystemVersionString(void);
 
 void abort_with_reason(uint32_t reason_namespace, uint64_t reason_code, const char *reason_string, uint64_t reason_flags);
@@ -179,11 +180,12 @@ FILE *crashreporter_open_outfile(const char *source, char **nameOut)
 			CFRelease(deviceVersion);
 		}
 
-	#ifdef __arm64e__
-		fprintf(f, "Architecture:   arm64e\n");
-	#else
-		fprintf(f, "Architecture:   arm64\n");
-	#endif
+		if (host_is_arm64e()) {
+			fprintf(f, "Architecture:   arm64e\n");
+		}
+		else {
+			fprintf(f, "Architecture:   arm64\n");
+		}
 		fprintf(f, "\n");
 	}
 
@@ -373,32 +375,41 @@ void *crashreporter_listen(void *arg)
 
 void crashreporter_pause(void)
 {
-	if (gCrashReporterState == kCrashReporterStateActive) {
-		task_set_exception_ports(mach_task_self_, EXC_MASK_CRASH_RELATED, 0, EXCEPTION_DEFAULT, ARM_THREAD_STATE64);
-		NSSetUncaughtExceptionHandler(defaultNSExceptionHandler);
-		defaultNSExceptionHandler = nil;
-		gCrashReporterState = kCrashReporterStatePaused;
+	if (@available(iOS 17.0, *)) {}
+	else {
+		if (gCrashReporterState == kCrashReporterStateActive) {
+			task_set_exception_ports(mach_task_self_, EXC_MASK_CRASH_RELATED, 0, EXCEPTION_DEFAULT, ARM_THREAD_STATE64);
+			NSSetUncaughtExceptionHandler(defaultNSExceptionHandler);
+			defaultNSExceptionHandler = nil;
+			gCrashReporterState = kCrashReporterStatePaused;
+		}
 	}
 }
 
 void crashreporter_resume(void)
 {
-	if (gCrashReporterState == kCrashReporterStatePaused) {
-		task_set_exception_ports(mach_task_self_, EXC_MASK_CRASH_RELATED, gExceptionPort, EXCEPTION_DEFAULT, ARM_THREAD_STATE64);
-		defaultNSExceptionHandler = NSGetUncaughtExceptionHandler();
-		NSSetUncaughtExceptionHandler(crashreporter_catch_objc);
-		gCrashReporterState = kCrashReporterStateActive;
+	if (@available(iOS 17.0, *)) {}
+	else {
+		if (gCrashReporterState == kCrashReporterStatePaused) {
+			task_set_exception_ports(mach_task_self_, EXC_MASK_CRASH_RELATED, gExceptionPort, EXCEPTION_DEFAULT, ARM_THREAD_STATE64);
+			defaultNSExceptionHandler = NSGetUncaughtExceptionHandler();
+			NSSetUncaughtExceptionHandler(crashreporter_catch_objc);
+			gCrashReporterState = kCrashReporterStateActive;
+		}
 	}
 }
 
 void crashreporter_start(void)
 {
-	if (gCrashReporterState == kCrashReporterStateNotActive) {
-		mach_port_allocate(mach_task_self_, MACH_PORT_RIGHT_RECEIVE, &gExceptionPort);
-		mach_port_insert_right(mach_task_self_, gExceptionPort, gExceptionPort, MACH_MSG_TYPE_MAKE_SEND);
-		pthread_create(&gExceptionThread, NULL, crashreporter_listen, "crashreporter");
-		gCrashReporterState = kCrashReporterStatePaused;
-		crashreporter_resume();
+	if (@available(iOS 17.0, *)) {}
+	else {
+		if (gCrashReporterState == kCrashReporterStateNotActive) {
+			mach_port_allocate(mach_task_self_, MACH_PORT_RIGHT_RECEIVE, &gExceptionPort);
+			mach_port_insert_right(mach_task_self_, gExceptionPort, gExceptionPort, MACH_MSG_TYPE_MAKE_SEND);
+			pthread_create(&gExceptionThread, NULL, crashreporter_listen, "crashreporter");
+			gCrashReporterState = kCrashReporterStatePaused;
+			crashreporter_resume();
+		}
 	}
 }
 

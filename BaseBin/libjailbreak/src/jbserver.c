@@ -48,6 +48,12 @@ int jbserver_received_xpc_message(struct jbserver_impl *server, xpc_object_t xms
 				case JBS_TYPE_FD:
 				args[i] = (void *)(int64_t)xpc_dictionary_dup_fd(xmsg, argDesc->name);
 				break;
+				case JBS_TYPE_MACH_RECV:
+				args[i] = (void *)(int64_t)xpc_dictionary_extract_mach_recv(xmsg, argDesc->name);
+				break;
+				case JBS_TYPE_MACH_SEND:
+				args[i] = (void *)(int64_t)xpc_dictionary_copy_mach_send(xmsg, argDesc->name);
+				break;
 				case JBS_TYPE_STRING:
 				args[i] = (void *)xpc_dictionary_get_string(xmsg, argDesc->name);
 				break;
@@ -92,6 +98,14 @@ int jbserver_received_xpc_message(struct jbserver_impl *server, xpc_object_t xms
 				case JBS_TYPE_FD: {
 					xpc_dictionary_set_fd(xreply, argDesc->name, (int)(int64_t)argsOut[i]);
 					close((int)(int64_t)argsOut[i]);
+					break;
+				}
+				case JBS_TYPE_MACH_RECV: {
+					xpc_dictionary_set_mach_recv(xreply, argDesc->name, (mach_port_t)(uint64_t)argsOut[i]);
+					break;
+				}
+				case JBS_TYPE_MACH_SEND: {
+					xpc_dictionary_set_mach_send(xreply, argDesc->name, (mach_port_t)(uint64_t)argsOut[i]);
 					break;
 				}
 				case JBS_TYPE_STRING: {

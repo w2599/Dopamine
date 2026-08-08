@@ -9,9 +9,7 @@
 // I don't like this as it breaks executing multiple threads at the same time
 // But as we don't even really do/support that currently anyways, it doesn't matter
 uint64_t getUserReturnThreadContext(void);
-extern volatile uint64_t gUserReturnDidHappen;
-
-#ifndef __arm64e__
+extern uint64_t gUserReturnDidHappen;
 
 arm64KcallThread gArm64KcallThead;
 
@@ -110,7 +108,12 @@ uint64_t arm64_kcall(uint64_t func, int argc, const uint64_t *argv)
 
 int arm64_kcall_init(void)
 {
+	if (host_is_arm64e()) return -1;
+
 	if (!gPrimitives.kalloc_local) return -1;
+
+	// Disabled on 16+ until further notice
+	if (__builtin_available(iOS 16, *)) return -1;
 	
 	// When doing an OTA update from 2.0.x to >=2.1, we will not have offsets for kcall yet so we can't initialize it
 	if (!koffsetof(thread, machine_contextData)) return -1;
@@ -138,9 +141,3 @@ int arm64_kcall_init(void)
 	
 	return 0;
 }
-
-#else
-
-int arm64_kcall_init(void) { return -1; }
-
-#endif

@@ -4,6 +4,7 @@
 #include <libjailbreak/info.h>
 #include <libjailbreak/kernel.h>
 #include <libjailbreak/primitives.h>
+#include <libjailbreak/util.h>
 
 static bool root_domain_allowed(audit_token_t clientToken)
 {
@@ -38,26 +39,21 @@ static int root_steal_ucred(audit_token_t *clientToken, uint64_t ucred, uint64_t
 	uint64_t proc = proc_find(pid);
 
 	*orgUcred = proc_ucred(proc);
-	if (gSystemInfo.kernelStruct.proc_ro.exists) {
-		uint64_t proc_ro = kread_ptr(proc + koffsetof(proc, proc_ro));
-		kwrite64(proc_ro + koffsetof(proc_ro, ucred), ucred);
-	}
-	else {
-		kwrite_ptr(proc + koffsetof(proc, ucred), ucred, 0x84E8);
+	proc_ucred_update(proc, ucred);
+
+	if (!host_is_arm64e()) {
+		if (ucred == kern_ucred) {
+			// For some reason we need to borrow this from our process just for bind mount entitlement.
+			uint64_t our_label = kread_ptr(*orgUcred + koffsetof(ucred, label));
+			uint64_t our_slot = mac_label_get(our_label, 0);
+			mac_label_set(kread_ptr(kern_ucred + koffsetof(ucred, label)), 0, our_slot);
+		}
+		else {
+			// Revert it to what it should be
+			mac_label_set(kread_ptr(kern_ucred + koffsetof(ucred, label)), 0, -1);
+		}
 	}
 
-#ifndef __arm64e__
-	if (ucred == kern_ucred) {
-		// For some reason we need to borrow this from our process just for bind mount entitlement.
-		uint64_t our_label = kread_ptr(*orgUcred + koffsetof(ucred, label));
-		uint64_t our_slot = mac_label_get(our_label, 0);
-		mac_label_set(kread_ptr(kern_ucred + koffsetof(ucred, label)), 0, our_slot);
-	}
-	else {
-		// Revert it to what it should be
-		mac_label_set(kread_ptr(kern_ucred + koffsetof(ucred, label)), 0, -1);
-	}
-#endif
 	return 0;
 }
 

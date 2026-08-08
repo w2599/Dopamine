@@ -18,14 +18,14 @@
 #include <mach-o/dyld_images.h>
 #include <mach-o/getsect.h>
 #include <dyld_cache_format.h>
+#include <sys/param.h>
+#include <sys/mount.h>
+#include <stdatomic.h>
+#include <errno.h>
 extern char **environ;
 
 #define FAKE_PHYSPAGE_TO_MAP 0x13370000
 
-#define POSIX_SPAWN_PERSONA_FLAGS_OVERRIDE 1
-extern int posix_spawnattr_set_persona_np(const posix_spawnattr_t* __restrict, uid_t, uint32_t);
-extern int posix_spawnattr_set_persona_uid_np(const posix_spawnattr_t* __restrict, uid_t);
-extern int posix_spawnattr_set_persona_gid_np(const posix_spawnattr_t* __restrict, uid_t);
 int posix_spawnattr_set_registered_ports_np(posix_spawnattr_t * __restrict attr, mach_port_t portarray[], uint32_t count);
 
 const struct mach_header *get_mach_header(const char *name)
@@ -38,6 +38,36 @@ const struct mach_header *get_mach_header(const char *name)
 		}
 	}
 	return mh;
+}
+
+uintptr_t get_mach_vmaddr_slide(const char *name)
+{
+	uintptr_t slide = 0;
+	for (int i = 0; i < _dyld_image_count(); i++) {
+		if (!strcmp(_dyld_get_image_name(i), name)) {
+			slide = _dyld_get_image_vmaddr_slide(i);
+			break;
+		}
+	}
+	return slide;
+}
+
+bool host_is_arm64e(void)
+{
+	static cpu_type_t hostCpuType;
+	static cpu_subtype_t hostCpuSubtype;
+	static dispatch_once_t onceToken = 0;
+	dispatch_once(&onceToken, ^{
+		size_t len;
+		// Query for cputype
+		len = sizeof(hostCpuType);
+		if (sysctlbyname("hw.cputype", &hostCpuType, &len, NULL, 0) == -1) { printf("Error: no cputype.\n"); }
+		// Query for cpusubtype
+		len = sizeof(hostCpuSubtype);
+		if (sysctlbyname("hw.cpusubtype", &hostCpuSubtype, &len, NULL, 0) == -1) { printf("Error: no cpusubtype.\n"); }
+	});
+
+	return (hostCpuType == CPU_TYPE_ARM64) && ((hostCpuSubtype & ~0xff000000) == CPU_SUBTYPE_ARM64E);
 }
 
 void proc_iterate(void (^itBlock)(uint64_t, bool*))
@@ -98,7 +128,7 @@ uint64_t ttep_self(void)
 	static uint64_t gSelfTTEP = 0;
 	static dispatch_once_t onceToken;
 	dispatch_once(&onceToken, ^{
-		gSelfTTEP = kread_ptr(pmap_self() + koffsetof(pmap, ttep));
+		gSelfTTEP = kread64(pmap_self() + koffsetof(pmap, ttep));
 	});
 	return gSelfTTEP;
 }
@@ -129,37 +159,190 @@ uint64_t task_get_ipc_port_kobject(uint64_t task, mach_port_t port)
 	return kread_ptr(task_get_ipc_port_object(task, port) + koffsetof(ipc_port, kobject));
 }
 
+uint32_t sptm_frame_get_refcnt_off(uint64_t frame)
+{
+	uint8_t typeIdx = kread8(frame + koffsetof(sptm_frame, type));
+	uint32_t refcnt_off = 0;
+
+	if (ksymbol(libsptm_frame_type_params)) {
+		uint64_t typeDescriptor = kread64(ksymbol(libsptm_frame_type_params)) + (ksizeof(sptm_frame_type_descriptor) * typeIdx);
+		uint8_t type = kread8(typeDescriptor + koffsetof(sptm_frame_type_descriptor, type));
+		
+		if (type == 1) {
+			refcnt_off = koffsetof(sptm_frame, nested_refcnt);
+		}
+		else if (type == 2) {
+			refcnt_off = koffsetof(sptm_frame, mapping_refcnt);
+		}
+		else {
+			printf("WARNING: Hit unknown refcnt type (%d) from index %d on frame %#llx (nested_refcnt: %u, mapping_refcnt: %u)\n", type, typeIdx, frame, kread16(frame + koffsetof(sptm_frame, nested_refcnt)), kread16(frame + koffsetof(sptm_frame, mapping_refcnt)));
+		}
+	}
+	else {
+		if (typeIdx == 8 || typeIdx == 17 || typeIdx == 18 || typeIdx == 31) {
+        	refcnt_off = koffsetof(sptm_frame, nested_refcnt);
+		}
+		else if (typeIdx == 9 || typeIdx == 19 || typeIdx == 20 || typeIdx == 32) {
+			refcnt_off = koffsetof(sptm_frame, mapping_refcnt);
+		}
+		else {
+			printf("WARNING: Hit unknown refcnt type index (%d) on frame %#llx (nested_refcnt: %u, mapping_refcnt: %u)\n", typeIdx, frame, kread16(frame + koffsetof(sptm_frame, nested_refcnt)), kread16(frame + koffsetof(sptm_frame, mapping_refcnt)));
+		}
+	}
+
+	return refcnt_off;
+}
+
+uint16_t pagetable_get_refcnt(uint64_t pt_pa)
+{
+	if (ksymbol(libsptm_frame_table)) {
+		uint64_t sptmFrame = pa_to_sptm_frame(pt_pa);
+		uint64_t refcntOff = sptm_frame_get_refcnt_off(sptmFrame);
+		if (!refcntOff) return 0;
+		return kread16(sptmFrame + refcntOff);
+	}
+	else {
+		uint64_t pvh = pai_to_pvh(pa_index(pt_pa));
+		uint64_t ptdp = pvh_ptd(pvh);
+		uint64_t pinfo = kread64(ptdp + koffsetof(pt_desc, ptd_info));
+		return kread16(pinfo + 0x0);
+	}
+}
+
+void pagetable_set_refcnt(uint64_t pt_pa, uint16_t refcnt)
+{
+	if (ksymbol(libsptm_frame_table)) {
+		uint64_t sptmFrame = pa_to_sptm_frame(pt_pa);
+		uint64_t refcntOff = sptm_frame_get_refcnt_off(sptmFrame);
+		if (!refcntOff) return;
+		physwrite16(kvtophys(sptmFrame + refcntOff), refcnt);
+	}
+	else {
+		uint64_t pvh = pai_to_pvh(pa_index(pt_pa));
+		uint64_t ptdp = pvh_ptd(pvh);
+		uint64_t pinfo = kread64(ptdp + koffsetof(pt_desc, ptd_info));
+		physwrite16(kvtophys(pinfo + 0x0), refcnt);
+	}
+}
+
+void pagetable_modify_refcount(uint64_t pt_pa, int32_t delta)
+{
+	if (delta == 0) return;
+
+	uint64_t refcntPtr = 0;
+
+	if (ksymbol(libsptm_frame_table)) {
+		uint64_t sptmFrame = pa_to_sptm_frame(pt_pa);
+		uint64_t refcntOff = sptm_frame_get_refcnt_off(sptmFrame);
+		if (!refcntOff) return;
+		refcntPtr = kvtophys(sptmFrame + refcntOff);
+	}
+	else {
+		uint64_t pvh = pai_to_pvh(pa_index(pt_pa));
+		uint64_t ptdp = pvh_ptd(pvh);
+		uint64_t pinfo = kread64(ptdp + koffsetof(pt_desc, ptd_info));
+		refcntPtr = kvtophys(pinfo + 0x0);
+	}
+
+	if (gPrimitives.physaccess_mapped) {
+		physaccess_mapped(refcntPtr, sizeof(uint16_t), ^(void *ptr){
+			_Atomic(uint16_t) *uintPtr = ptr;
+			if (delta > 0) {
+				atomic_fetch_add(uintPtr, delta);
+			}
+			else if (delta < 0) {
+				atomic_fetch_sub(uintPtr, -delta);
+			}
+		});
+	}
+	else {
+		physwrite16(refcntPtr, physread16(refcntPtr) + delta);
+	}
+}
+
+void pagetable_set_pmap(uint64_t pt_pa, uint64_t pmap)
+{
+	uint64_t pvh = pai_to_pvh(pa_index(pt_pa));
+	uint64_t ptdp = pvh_ptd(pvh);
+	uint64_t ptdp_pa = kvtophys(ptdp);
+
+	physwrite64(ptdp_pa + koffsetof(pt_desc, pmap), pmap);
+}
+
+void pagetable_set_vas(uint64_t pt_pa, uint64_t va_start)
+{
+	uint64_t pvh = pai_to_pvh(pa_index(pt_pa));
+	uint64_t ptdp = pvh_ptd(pvh);
+	uint64_t ptdp_pa = kvtophys(ptdp);
+
+	// On A14+ PT_INDEX_MAX is 4, for whatever reason
+	// However in practice, only the first slot is used...
+	for (uint64_t po = 0; po < vm_page_size; po += vm_real_kernel_page_size) {
+		physwrite64(ptdp_pa + koffsetof(pt_desc, va) + (po / vm_page_size), va_start + po);
+	}
+}
+
+void pagetable_set_level(uint64_t pt_pa, uint8_t level)
+{
+	if (ksymbol(libsptm_frame_table)) {
+		uint64_t sptmFrame = pa_to_sptm_frame(pt_pa);
+		physwrite16(kvtophys(sptmFrame + koffsetof(sptm_frame, level)), level);
+	}
+}
+
+#define L2_ROUND_DOWN(x) (((vm_address_t)(x)) & (~(L2_BLOCK_SIZE-1)))
+#define L2_ROUND_UP(x) ( (((vm_address_t)(x)) + L2_BLOCK_SIZE-1)  & (~(L2_BLOCK_SIZE-1)) ) 
+
+void *allocate_page_table_range(void)
+{
+	task_vm_info_data_t data = {};
+	task_info_t info = (task_info_t)(&data);
+	mach_msg_type_number_t count = TASK_VM_INFO_COUNT;
+	task_info(mach_task_self(), TASK_VM_INFO, info, &count);
+
+	for (vm_address_t curBlock = L2_ROUND_UP(data.min_address); curBlock < L2_ROUND_DOWN(data.max_address); curBlock += L2_BLOCK_SIZE) {
+		vm_address_t thisAllocation = curBlock;
+		if (vm_allocate(mach_task_self(), &thisAllocation, L2_BLOCK_SIZE, VM_FLAGS_FIXED) == KERN_SUCCESS) {
+			return (void *)thisAllocation;
+		}
+	}
+
+	return NULL;
+}
+
+void free_page_table_range(void *start)
+{
+	vm_address_t vmaddr = (vm_address_t)start;
+	vm_deallocate(mach_task_self(), vmaddr, L2_BLOCK_SIZE);
+}
+
 uint64_t alloc_page_table_unassigned(void)
 {
 	uint64_t pmap = pmap_self();
 	uint64_t ttep = kread64(pmap + koffsetof(pmap, ttep));
 
 	void *free_lvl2 = NULL;
-	uint64_t tte_lvl2 = 0;
+	uint64_t ttep_lvl2 = 0;
 	uint64_t allocatedPT = 0;
-	uint64_t pinfo_pa = 0;
 	while (true) {
 		// When we allocate the entire address range of an L2 block, we can assume ownership of the backing table
-		if (posix_memalign(&free_lvl2, L2_BLOCK_SIZE, L2_BLOCK_SIZE) != 0) {
+		free_lvl2 = allocate_page_table_range();
+		if (free_lvl2 == NULL) {
 			printf("WARNING: Failed to allocate L2 page table address range\n");
 			return 0;
 		}
 		// Now, fault in one page to make the kernel allocate the page table for it
-		*(volatile uint64_t *)free_lvl2;
-
+		mlock((void *)free_lvl2, 0x4000);
+	
 		// Find the newly allocated page table
 		uint64_t lvl = PMAP_TT_L2_LEVEL;
-		allocatedPT = vtophys_lvl(ttep, (uint64_t)free_lvl2, &lvl, &tte_lvl2);
+		allocatedPT = vtophys_lvl(ttep, (uint64_t)free_lvl2, &lvl, &ttep_lvl2);
 
-		uint64_t pvh = pai_to_pvh(pa_index(allocatedPT));
-		uint64_t ptdp = pvh_ptd(pvh);
-		uint64_t pinfo = kread64(ptdp + koffsetof(pt_desc, ptd_info));
-		pinfo_pa = kvtophys(pinfo);
-
-		uint16_t refCount = physread16(pinfo_pa);
-		if (refCount != 1) {
+		uint16_t refcnt = pagetable_get_refcnt(allocatedPT);
+		if (refcnt != 1) {
 			// Something is off, retry
-			free(free_lvl2);
+			munlock((void *)free_lvl2, 0x4000);
+			free_page_table_range(free_lvl2);
 			continue;
 		}
 		break;
@@ -191,13 +374,14 @@ uint64_t alloc_page_table_unassigned(void)
 	}*/
 
 	// Bump reference count of our allocated page table
-	physwrite16(pinfo_pa, 0x1337);
+	pagetable_set_refcnt(allocatedPT, 0x1337);
 
 	// Deallocate address range (our allocated page table will stay because we bumped it's reference count)
-	free(free_lvl2);
+	munlock((void *)free_lvl2, 0x4000);
+	free_page_table_range(free_lvl2);
 
 	// Remove our allocated page table from it's original location (leak it)
-	physwrite64(tte_lvl2, 0);
+	physwrite64(ttep_lvl2, 0);
 
 	// Ensure there is at least one entry in page table
 	// Attempts to prevent "pte is empty" panic
@@ -208,7 +392,12 @@ uint64_t alloc_page_table_unassigned(void)
 	// Reference count of new page table must be 0!
 	// original ref count is 1 because the table holds one PTE
 	// Our new PTEs are not part of the pmap layer though so refcount needs to be 0
-	physwrite16(pinfo_pa, 0);
+	pagetable_set_refcnt(allocatedPT, 0);
+
+	if (ksymbol(libsptm_frame_table)) {
+		// On SPTM, the refcount of the parent has to be decremented aswell
+		pagetable_modify_refcount(ttep_lvl2, -1);
+	}
 
 	// After we leaked the page table, the ledger still thinks it belongs to our process
 	// We need to remove it from there aswell so that the process doesn't get jetsam killed
@@ -221,37 +410,28 @@ uint64_t alloc_page_table_unassigned(void)
 	return allocatedPT;
 }
 
-uint64_t pmap_alloc_page_table(uint64_t pmap, uint64_t va)
+uint64_t pmap_alloc_page_table(uint64_t pmap, uint8_t level, uint64_t va_start)
 {
 	if (!pmap) {
 		pmap = pmap_self();
 	}
 
-	uint64_t tt_p = alloc_page_table_unassigned();
-	if (!tt_p) return 0;
+	uint64_t pt_pa = alloc_page_table_unassigned();
+	if (!pt_pa) return 0;
 
-	uint64_t pvh = pai_to_pvh(pa_index(tt_p));
-	uint64_t ptdp = pvh_ptd(pvh);
+	// At this point the allocated page table is associated to the pmap of this process and the virtual address it was allocated on
+	// On SPTM devices, the page table is also associated to the level it was previously used for
+	// We now need to replace this info with the correct context in which it will be used
+	pagetable_set_pmap(pt_pa, pmap);
+	pagetable_set_vas(pt_pa, va_start);
+	pagetable_set_level(pt_pa, level);
 
-	uint64_t ptdp_pa = kvtophys(ptdp);
-
-	// At this point the allocated page table is associated
-	// to the pmap of this process alongside the address it was allocated on
-	// We now need to replace the association with the context in which it will be used
-	physwrite64(ptdp_pa + koffsetof(pt_desc, pmap), pmap);
-
-	// On A14+ PT_INDEX_MAX is 4, for whatever reason
-	// However in practice, only the first slot is used...
-	for (uint64_t po = 0; po < vm_page_size; po += vm_real_kernel_page_size) {
-		physwrite64(ptdp_pa + koffsetof(pt_desc, va) + (po / vm_page_size), va + po);
-	}
-
-	return tt_p;
+	return pt_pa;
 }
 
 int pmap_expand_range(uint64_t pmap, uint64_t vaStart, uint64_t size)
 {
-	uint64_t ttep = kread_ptr(pmap + koffsetof(pmap, ttep));
+	uint64_t ttep = kread64(pmap + koffsetof(pmap, ttep));
 
 	if (is_kcall_available()) {
 		uint64_t unmappedStart = 0, unmappedSize = 0;
@@ -322,9 +502,26 @@ int pmap_expand_range(uint64_t pmap, uint64_t vaStart, uint64_t size)
 						}
 					}
 					leafLevel++;
-					uint64_t newTable = pmap_alloc_page_table(pmap, pt_va);
+					uint64_t newTable = pmap_alloc_page_table(pmap, leafLevel, pt_va);
 					if (newTable) {
+						uint64_t oldEntry = physread64(pte);
 						physwrite64(pte, newTable | ARM_TTE_VALID | ARM_TTE_TYPE_TABLE);
+						if (ksymbol(libsptm_frame_table) && !oldEntry) {
+							// On SPTM, we need to bump the refcount of the parent page table aswell
+							uint64_t parentPt = 0;
+							uint64_t parentLevel = leafLevel - 1;
+
+							if (parentLevel == 1) {
+								// The level 1 page table can either be 0x4000 in size (iOS 17-18) or 0x40 in size (iOS 26+)
+								// To make sure this is always right, we just take it directly from ttep
+								parentPt = ttep;
+							}
+							else {
+								parentPt = pte & ~PAGE_MASK;
+							}
+
+							pagetable_modify_refcount(parentPt, 1);
+						}
 					}
 					else {
 						return -2;
@@ -336,7 +533,7 @@ int pmap_expand_range(uint64_t pmap, uint64_t vaStart, uint64_t size)
 	return 0;
 }
 
-int pmap_map_in(uint64_t pmap, uint64_t uaStart, uint64_t paStart, uint64_t size)
+int pmap_map_in_with_flags(uint64_t pmap, uint64_t uaStart, uint64_t paStart, uint64_t size, uint64_t flags)
 {
 	uint64_t ttep = kread64(pmap + koffsetof(pmap, ttep));
 
@@ -366,12 +563,12 @@ int pmap_map_in(uint64_t pmap, uint64_t uaStart, uint64_t paStart, uint64_t size
 			}
 		}
 
-		if (vtophys(ttep, ua)) return -1;
-		// TODO: If all mappings match 1:1, maybe return 0 instead of -1?
+		if (vtophys(ttep, ua)) return -2;
+		// TODO: If all mappings match 1:1, maybe return 0 instead?
 	}
 
 	// Allocate all page tables that need to be allocated
-	if (pmap_expand_range(pmap, uaStart, size) != 0) return -1;
+	if (pmap_expand_range(pmap, uaStart, size) != 0) return -3;
 
 	// Insert entries into L3 pages
 	uint64_t curPA = paStart;
@@ -391,23 +588,28 @@ int pmap_map_in(uint64_t pmap, uint64_t uaStart, uint64_t paStart, uint64_t size
 		memset(tableToWrite, 0, sizeof(tableToWrite));
 		for (uint64_t curUA = uaL2CurStart; curUA < uaL2CurEnd; curUA += vm_real_kernel_page_size, curPA += vm_real_kernel_page_size) {
 			int idx = (curUA - uaL2Cur) / vm_real_kernel_page_size;
-			tableToWrite[idx] = curPA | PERM_TO_PTE(PERM_KRW_URW) | PTE_NON_GLOBAL | PTE_OUTER_SHAREABLE | PTE_LEVEL3_ENTRY;
+			tableToWrite[idx] = curPA | flags;
 		}
 
 		// Replace table with the entries we generated
 		uint64_t leafLevel = PMAP_TT_L2_LEVEL;
 		uint64_t level2Table = vtophys_lvl(ttep, uaL2Cur, &leafLevel, NULL);
-		if (!level2Table) return -2;
+		if (!level2Table) return -4;
 		physwritebuf(level2Table, tableToWrite, vm_real_kernel_page_size);
 	}
 
 	return 0;
 }
 
-#ifdef __arm64e__
+int pmap_map_in(uint64_t pmap, uint64_t uaStart, uint64_t paStart, uint64_t size)
+{
+	return pmap_map_in_with_flags(pmap, uaStart, paStart, size, PERM_TO_PTE(PERM_KRW_URW) | PTE_NON_GLOBAL | PTE_OUTER_SHAREABLE | PTE_LEVEL3_ENTRY);	
+}
 
 uint64_t pmap_find_main_binary_code_dir(uint64_t pmap)
 {
+	if (!host_is_arm64e()) return -1;
+
 	uint64_t mainCodeDir = 0;
 	uint64_t pmap_cs_region = kread_ptr(pmap + koffsetof(pmap, pmap_cs_main));
 	while (pmap_cs_region && !mainCodeDir) {
@@ -427,6 +629,8 @@ uint64_t pmap_find_main_binary_code_dir(uint64_t pmap)
 
 uint64_t proc_find_main_binary_code_dir(uint64_t proc)
 {
+	if (!host_is_arm64e()) return -1;
+
 	uint64_t task = proc_task(proc);
 	uint64_t map = kread_ptr(task + koffsetof(task, map));
 	uint64_t pmap = kread_ptr(map + koffsetof(vm_map, pmap));
@@ -435,6 +639,8 @@ uint64_t proc_find_main_binary_code_dir(uint64_t proc)
 
 uint32_t pmap_cs_trust_string_to_int(const char *trustString)
 {
+	if (!host_is_arm64e()) return -1;
+
 	int trustInt = 0;
 	if (__builtin_available(iOS 16.0, *)) {
 		if      (!strcmp(trustString, "PMAP_CS_UNTRUSTED"))             trustInt = 0;
@@ -461,8 +667,6 @@ uint32_t pmap_cs_trust_string_to_int(const char *trustString)
 	}
 	return trustInt;
 }
-
-#endif
 
 int sign_kernel_thread(uint64_t proc, mach_port_t threadPort)
 {
@@ -565,6 +769,54 @@ void proc_remove_msg_filter(uint64_t proc)
 			kwrite32(task + koffsetof(task, flags), t_flags & ~TFRO_FILTER_MSG);
 		}
 	}
+}
+
+uint64_t proc_get_vnode_for_fd(uint64_t proc, int fd)
+{
+	uint64_t ofiles = kread_ptr(proc + koffsetof(proc, fd) + koffsetof(filedesc, ofiles_start));
+	uint64_t fileproc = kread_ptr(ofiles + (fd * sizeof(void *)));
+	uint64_t fileglob = kread_ptr(fileproc + koffsetof(fileproc, glob));
+	return kread_ptr(fileglob + koffsetof(fileglob, data));
+}
+
+int fd_attach_signature(int fd, fsignatures_t *signature)
+{
+	off_t origPos = lseek(fd, 0, SEEK_CUR);
+
+	// Read header, we need it later for the cputype and cpusubtype
+	struct mach_header header;
+	lseek(fd, signature->fs_file_start, SEEK_SET);
+	if (read(fd, &header, sizeof(header)) != sizeof(header)) return -2;
+
+	// Attach signature, since this is a binary it requires the fixup below
+	// (For libraries this works without any fix up, since this is how dyld attaches them normally)
+	lseek(fd, 0, SEEK_SET);
+	int r = fcntl(fd, F_ADDSIGS, signature);
+	lseek(fd, origPos, SEEK_SET);
+	if (r != 0) return r;
+
+	// Find cs_blob of the signature that we just attached
+	uint64_t vnode = proc_get_vnode_for_fd(proc_self(), fd);
+	uint64_t ubc_info = kread_ptr(vnode + koffsetof(vnode, un));
+	uint64_t cs_blob = kread_ptr(ubc_info + koffsetof(ubc_info, cs_blobs));
+	uint64_t target_cs_blob = 0;
+	if (cs_blob) {
+		do {
+			uint64_t base_offset = kread64(cs_blob + koffsetof(cs_blob, base_offset));
+			if (signature->fs_file_start == base_offset) {
+				target_cs_blob = cs_blob;
+				break;
+			}
+		} while (((cs_blob = kread_ptr(cs_blob + koffsetof(cs_blob, next))) != 0));
+	}
+
+	if (!target_cs_blob) return -4;
+
+	// By default signatures attached via fcntl have cpu_type=-1, cpu_subtype=-1
+	// In order to make the binary actually execute, we need to set them to the right values ourselves
+	kwrite32(target_cs_blob + koffsetof(cs_blob, cpu_type), header.cputype);
+	kwrite32(target_cs_blob + koffsetof(cs_blob, cpu_subtype), header.cpusubtype);
+	return 0;
 }
 
 int cmd_wait_for_exit(pid_t pid)
@@ -715,6 +967,195 @@ int jbctl_earlyboot(mach_port_t earlyBootServer, ...)
 	posix_spawnattr_destroy(&attr);
 	if (r != 0) return r;
 	return cmd_wait_for_exit(spawnedPid);
+}
+
+void proc_ucred_update(uint64_t proc, uint64_t newUcred)
+{
+	if (gSystemInfo.kernelStruct.proc_ro.exists) {
+		uint64_t proc_ro = kread_ptr(proc + koffsetof(proc, proc_ro));
+		kwrite64(proc_ro + koffsetof(proc_ro, ucred), newUcred);
+	}
+	else {
+		kwrite_ptr(proc + koffsetof(proc, ucred), newUcred, 0x84E8);
+	}
+}
+
+// NOTE: This functions assumes both processes to be in a somewhat paused state
+// Right now, in practice this is
+// procCopyTo: dyldhook or systemhook checking in (paused, waiting for response from launchd)
+// procCopyFrom: child process of target binary spawned as root (paused, waiting for us to kill it)
+void proc_copy_ucred(uint64_t procCopyFrom, uint64_t procCopyTo)
+{
+	uint64_t ucredToCopy = proc_ucred(procCopyFrom);
+	uint64_t origUcred   = proc_ucred(procCopyTo);
+
+	// Every process and every thread holds a lock on both ucred and ucred_rw
+
+	// Since we replace the ucred of procCopyTo, we need to decrement the refcnt of it's original ucred
+	// Then it will be freed by the system as soon as all threads have switched 
+	// to the new ucred via current_cached_proc_cred_update
+	kauth_cred_drop(origUcred);
+	kauth_cred_unref(origUcred);
+
+	// Since ucredToCopy will now be active on a new process, we need to bump it's refcount
+	kauth_cred_ref(ucredToCopy);
+	kauth_cred_hold(ucredToCopy);
+
+	// TODO: do we need to preserve mac_label to retain entitlements?
+
+	proc_ucred_update(procCopyTo, ucredToCopy);
+}
+
+int target_proc_with_ucred(const char *procPath, uid_t uid, gid_t gid, uid_t ruid, gid_t rgid, gid_t groups[NGROUPS_MAX])
+{
+	int comPipe[2];
+	pipe(comPipe);
+
+	posix_spawn_file_actions_t act;
+	posix_spawn_file_actions_init(&act);
+	posix_spawn_file_actions_adddup2(&act, comPipe[1], 3);
+
+	char uidString[12];
+	snprintf(uidString, sizeof(uidString), "%d", uid);
+
+	char gidString[12];
+	snprintf(gidString, sizeof(gidString), "%d", gid);
+
+	char ruidString[12];
+	snprintf(ruidString, sizeof(ruidString), "%d", ruid);
+
+	char rgidString[12];
+	snprintf(rgidString, sizeof(rgidString), "%d", rgid);
+
+	char groupsStrings[NGROUPS_MAX][12];
+	for (int i = 0; i < NGROUPS_MAX; i++) {
+		snprintf(groupsStrings[i], sizeof(groupsStrings[i]), "%d", groups[i]);
+	}
+
+	// exec_path
+	// 6 options
+	// 5 options with one arg
+	// 1 option with NGROUPS_MAX args
+	// NULL
+	const char *argv[1 + 6 + (5 * 1) + (1 * NGROUPS_MAX) + 1];
+	int idx = 0;
+	argv[idx++] = procPath;
+	argv[idx++] = "--fd";
+	argv[idx++] = "3";
+	argv[idx++] = "--uid";
+	argv[idx++] = uidString;
+	argv[idx++] = "--ruid";
+	argv[idx++] = ruidString;
+	argv[idx++] = "--gid";
+	argv[idx++] = gidString;
+	argv[idx++] = "--rgid";
+	argv[idx++] = rgidString;
+	argv[idx++] = "--groups";
+	for (int i = 0; i < NGROUPS_MAX; i++) {
+		argv[idx++] = groupsStrings[i];
+	}
+	argv[idx++] = NULL;
+
+	// In order to speed things up, skip any injection into the child process we spawn
+	const char *envp[] = {
+		"_SafeMode=1",
+		"DYLD_HOOK_SETUID=1",
+		NULL,
+	};
+
+	pid_t pid = 0;
+	int r = posix_spawn(&pid, procPath, &act, NULL, (char *const *)argv, (char *const *)envp);
+	posix_spawn_file_actions_destroy(&act);
+	if (r == 0) {
+		int r = 0;
+		read(comPipe[0], &r, sizeof(r));
+		close(comPipe[0]);
+		close(comPipe[1]);
+		return pid;
+	}
+
+	close(comPipe[0]);
+	close(comPipe[1]);
+
+	return -1;
+}
+
+int proc_ucred_update_content(uint64_t proc, const char *procPath, uid_t uid, gid_t gid, uid_t ruid, gid_t rgid, gid_t groups[NGROUPS_MAX])
+{
+	if (__builtin_available(iOS 17.0, *)) {
+		int childPid = target_proc_with_ucred(procPath, uid, gid, ruid, rgid, groups);
+		if (childPid == -1) {
+			return -1;
+		}
+
+		uint64_t childProc = proc_find(childPid);
+		proc_copy_ucred(childProc, proc);
+
+		kill(childPid, SIGKILL);
+		cmd_wait_for_exit(childPid);
+	}
+	else {
+		uint64_t ucred = proc_ucred(proc);
+
+		kwrite32(ucred + koffsetof(ucred, svuid), uid);
+		kwrite32(ucred + koffsetof(ucred, uid), uid);
+
+		kwrite32(ucred + koffsetof(ucred, svgid), gid);
+		kwrite32(ucred + koffsetof(ucred, groups), gid);
+	}
+
+	if (gSystemInfo.kernelStruct.proc_ro.exists) {
+		uint64_t proc_ro = kread_ptr(proc + koffsetof(proc, proc_ro));
+
+		if (koffsetof(proc_ro, task_tokens)) {
+			uint64_t auditToken = proc_ro + koffsetof(proc_ro, task_tokens) + koffsetof(task_token_ro_data, audit_token);
+			kwrite32(auditToken + 4, uid); // uid
+			kwrite32(auditToken + 8, gid); // gid
+			kwrite32(auditToken + 12, ruid); // ruid
+			kwrite32(auditToken + 16, rgid); // rgid
+		}
+	}
+
+	return 0;
+}
+
+uint64_t vm_page_for_pnum(uint64_t pnum)
+{
+	uint64_t vm_pages = kread64(ksymbol(vm_page_array_beginning_addr));
+	uint64_t vm_pages_end = kread64(ksymbol(vm_page_array_ending_addr));
+	uint32_t vm_pages_first_pnum = kread64(ksymbol(vm_first_phys_ppnum));
+	uint64_t vm_pages_count = (vm_pages_end - vm_pages) / ksizeof(vm_page);
+
+	uint64_t page = 0;
+	if (pnum >= (vm_pages_count + vm_pages_first_pnum))
+	{
+		page = 0;
+	}
+	else if (pnum >= vm_pages_first_pnum)
+	{
+		page = vm_pages + ((pnum - vm_pages_first_pnum) * ksizeof(vm_page));
+	}
+	else if (__builtin_available(iOS 27.0, *)) // pnum < vm_pages_first_pnum
+	{
+		// New path in iOS 27.0+ for pages between pmap_first_pnum and vm_pages_first_pnum
+		// Actually not a new path, but we have no need for supporting this API on lower versions at the moment
+		if (ksymbol(vm_pages_radix_root)) {
+			page = vm_page_find_canonical_radix(pnum);
+		}
+	}
+
+	return page;
+}
+
+uint64_t vm_page_for_pai(uint64_t pai)
+{
+	uint64_t vm_first_phys = kread64(ksymbol(vm_first_phys));
+	return vm_page_for_pnum(pai + atop(vm_first_phys));
+}
+
+uint64_t vm_page_for_pa(uint64_t pa)
+{
+	return vm_page_for_pnum(atop(pa));
 }
 
 void killall(const char *executablePath, int signal)

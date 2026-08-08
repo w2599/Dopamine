@@ -87,9 +87,16 @@
 "Theme" = "主題";
 "Kernel Exploit" = "核心漏洞";
 "PPL Bypass" = "繞過 PPL";
+"SPTM Bypass" = "繞過 SPTM";
 "PAC Bypass" = "繞過 PAC";
 "None" = "無";
 "Recommended" = "建議";
+
+// DarkSword Workaround
+/*Respring_Required*/
+/*Respring_Required_Message*/
+/*Respring_Required_Notice_A8*/
+/*Apply_Workaround*/
 
 // Credits
 "Credits_Button_Discord" = "Discord";
@@ -110,6 +117,7 @@
 "Exploiting Kernel (%@)" = "正在利用核心漏洞 (%@)";
 "Bypassing PAC (%@)" = "正在繞過 PAC 防護 (%@)";
 "Bypassing PPL (%@)" = "正在繞過 PPL 防護 (%@)";
+"Bypassing SPTM (%@)" = "正在繞過 SPTM 防護 (%@)";
 
 // Package Manager selection
 "Status_Title_Select_Package_Managers" = "選擇套件管理器";

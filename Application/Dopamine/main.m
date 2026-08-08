@@ -34,10 +34,6 @@ int main(int argc, char * argv[]) {
         }
     }
     
-    // If systemhook isn't loaded and we are already jailbroken, we need to do the checkin ourselves
-    // This can happen when the jailbreak is hidden or when tweak injection into the Dopamine app is disabled via Choicy
-    jbclient_process_checkin(NULL, NULL, NULL, NULL);
-    
     if ([DOEnvironmentManager sharedManager].isJailbroken) {
         setenv("PATH", "/sbin:/bin:/usr/sbin:/usr/bin:/var/jb/sbin:/var/jb/bin:/var/jb/usr/sbin:/var/jb/usr/bin", 1);
         setenv("TERM", "xterm-256color", 1);
