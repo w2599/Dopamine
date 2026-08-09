@@ -129,3 +129,6 @@
 "Status_Title_Select_Package_Managers" = "選擇套件管理器";
 "Select_Package_Managers_Install_Message" = "如果不確定該選哪一個，請選擇 Sileo";
 "Continue" = "繼續";
+
+"System_Uptime_Format" = "已運行: %d天 %d時 %d分 %d秒";
+"Settings_Disable_Update" = "禁止更新檢測";
