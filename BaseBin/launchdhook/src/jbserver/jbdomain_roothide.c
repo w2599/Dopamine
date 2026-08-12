@@ -104,6 +104,11 @@ static int roothide_palehide_present(audit_token_t *callerToken, bool* palehide)
 
 static int roothide_blacklist_check(audit_token_t *callerToken, const char* checktype, xpc_object_t checkvalue, bool* blacklisted)
 {
+	if (!checktype || !checkvalue || !blacklisted) {
+		JBLogError("Invalid arguments to roothide_blacklist_check");
+		*blacklisted = false;
+		return 0;
+	}
 	if(strcmp(checktype, "pid")==0) {
 		pid_t pid = (pid_t)xpc_uint64_get_value(checkvalue);
 		if(pid > 1) {
