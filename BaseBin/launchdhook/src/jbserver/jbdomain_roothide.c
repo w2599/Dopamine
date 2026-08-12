@@ -104,20 +104,38 @@ static int roothide_palehide_present(audit_token_t *callerToken, bool* palehide)
 
 static int roothide_blacklist_check(audit_token_t *callerToken, const char* checktype, xpc_object_t checkvalue, bool* blacklisted)
 {
+	if (!blacklisted) {
+		JBLogError("Missing blacklisted output argument");
+		return -1;
+	}
+
+	*blacklisted = false;
+
+	if (!checktype) {
+		JBLogError("Missing blacklist checktype");
+		return -1;
+	}
+
 	if(strcmp(checktype, "pid")==0) {
-		pid_t pid = (pid_t)xpc_uint64_get_value(checkvalue);
+		pid_t pid = 0;
+		if (checkvalue) {
+			pid = (pid_t)xpc_uint64_get_value(checkvalue);
+		} else if (callerToken) {
+			pid = audit_token_to_pid(*callerToken);
+		}
+
 		if(pid > 1) {
 			*blacklisted = isBlacklistedPid(pid);
 			return 0;
 		}
 	} else if(strcmp(checktype, "path")==0) {
-		const char* path = xpc_string_get_string_ptr(checkvalue);
+		const char* path = checkvalue ? xpc_string_get_string_ptr(checkvalue) : NULL;
 		if(path) {
 			*blacklisted = isBlacklistedPath(path);
 			return 0;
 		}
 	} else if(strcmp(checktype, "bundle")==0) {
-		const char* bundle = xpc_string_get_string_ptr(checkvalue);
+		const char* bundle = checkvalue ? xpc_string_get_string_ptr(checkvalue) : NULL;
 		if(bundle) {
 			*blacklisted = isBlacklistedApp(bundle);
 			return 0;
@@ -126,7 +144,8 @@ static int roothide_blacklist_check(audit_token_t *callerToken, const char* chec
 		JBLogError("Invalid checktype: %s", checktype);
 		return -1;
 	}
-	JBLogError("Failed to check blacklist for %s : %s", checktype, xpc_type_get_name(xpc_get_type(checkvalue)));
+
+	JBLogError("Failed to check blacklist for %s : %s", checktype, checkvalue ? xpc_type_get_name(xpc_get_type(checkvalue)) : "(null)");
 	return -1;
 }
 
