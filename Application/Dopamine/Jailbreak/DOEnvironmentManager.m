@@ -276,29 +276,19 @@ extern char **environ;
     return trollstoreInstallation;
 }
 
-- (void)updateJailbreakState
+- (BOOL)isJailbroken
 {
 /************** roothide specific ***********/
+    if (_isJailbroken)
+        return YES;
+
     if(!jbclient_roothide_jailbroken())
         return NO;
 /************** roothide specific ********/
 
-    
-    static BOOL jailbroken = NO;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        char *jbVersionC = NULL;
-        _isJailbroken = jbclient_dopamine_is_jailbroken(&jbVersionC);
-        if (jbVersionC) {
-            _jailbrokenVersion = [NSString stringWithUTF8String:jbVersionC];
-            free(jbVersionC);
-        }
-    });
-}
-
-- (BOOL)isJailbroken
-{
-    [self updateJailbreakState];
+    uint32_t csFlags = 0;
+    csops(getpid(), CS_OPS_STATUS, &csFlags, sizeof(csFlags));
+    _isJailbroken = (csFlags & CS_PLATFORM_BINARY) != 0;
     return _isJailbroken;
 }
 
@@ -325,13 +315,8 @@ extern char **environ;
 
 - (NSString *)jailbrokenVersion
 {
-    [self updateJailbreakState];
-    if (!_isJailbroken) return nil;
-    return _jailbrokenVersion;
-}
+    if (!self.isJailbroken) return nil;
 
-- (NSString *)systemVersion
-{
     __block NSString *version;
     [self runAsRoot:^{
         [self runUnsandboxed:^{
@@ -339,6 +324,11 @@ extern char **environ;
         }];
     }];
     return [[version componentsSeparatedByString:@"."] lastObject];
+}
+
+- (NSString *)systemVersion
+{
+    return (__bridge NSString *)MGCopyAnswer(CFSTR("ProductVersion"));
 }
 
 - (BOOL)isBootstrapped

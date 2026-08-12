@@ -13,8 +13,8 @@
 
 
 //MAKE_TRAMPOLINE(strncmp)
-MAKE_TRAMPOLINE(strlcpy)
-MAKE_TRAMPOLINE(strlcat)
+//MAKE_TRAMPOLINE(strlcpy)
+//MAKE_TRAMPOLINE(strlcat)
 
 .global _MACHOMERGER_ORIG__ZN5dyld46Loader18expandAtLoaderPathERNS_12RuntimeStateEPKcRKNS0_11LoadOptionsEPKS0_bPc
 .global _MACHOMERGER_HOOKTRAMPOLINE__ZN5dyld46Loader18expandAtLoaderPathERNS_12RuntimeStateEPKcRKNS0_11LoadOptionsEPKS0_bPc

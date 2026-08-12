@@ -166,9 +166,9 @@ do {
 /******************************************* roothide specfic ****************************************/
 
 
-					cdhashes = malloc(sizeof(cdhash_t));
-					cdhashesCount = 1;
-					memcpy(&cdhashes[0], &cdhash, sizeof(cdhash_t));
+					sigInfos = malloc(sizeof(cdhash_t));
+					sigInfoCount = 1;
+					memcpy(&sigInfos[0], &cdhash, sizeof(cdhash_t));
 
 
 /**********/

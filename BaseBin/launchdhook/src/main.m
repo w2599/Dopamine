@@ -192,8 +192,7 @@ __attribute__((constructor)) static void initializer(void)
 	initIPCHooks();
 	initJetsamHook();
 
-	sysctlbyname_orig = sysctlbyname;
-	litehook_rebind_symbol(LITEHOOK_REBIND_GLOBAL, (void *)sysctlbyname, (void *)sysctlbyname_hook, NULL);
+	MSHookFunction(sysctlbyname, (void *)sysctlbyname_hook, (void **)&sysctlbyname_orig);
 
 /*
 	if (getenv("DOPAMINE_IS_HIDDEN") != 0) {

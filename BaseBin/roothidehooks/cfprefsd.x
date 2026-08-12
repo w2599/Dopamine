@@ -1,7 +1,10 @@
 #import <Foundation/Foundation.h>
 #import <substrate.h>
 #include <roothide.h>
+#include <bsm/audit.h>
 #include "common.h"
+
+extern void xpc_connection_get_audit_token(xpc_connection_t connection, audit_token_t *audit_token);
 
 #define PROC_PIDPATHINFO_MAXSIZE        (4*MAXPATHLEN)
 
@@ -104,7 +107,9 @@ void* DISPATCH_orig__CFPrefsDaemon_handleMessage_fromPeer_replyHandler__(id self
 void* new__CFPrefsDaemon_handleMessage_fromPeer_replyHandler__(id self, xpc_object_t message, xpc_connection_t connection, void* replyHandler)
 {
     uid_t clientUid = xpc_connection_get_euid(connection);
-    pid_t clientPid = xpc_connection_get_pid(connection);
+	audit_token_t clientToken = {0};
+	xpc_connection_get_audit_token(connection, &clientToken);
+	pid_t clientPid = audit_token_to_pid(clientToken);
 
 	NSLog(@"CFPrefsDaemon: handleMessage %p/%d pid=%d uid=%d proc=%s", message, xpc_get_type(message)==XPC_TYPE_DICTIONARY, clientPid, clientUid, proc_get_path(clientPid,NULL));
 

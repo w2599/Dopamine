@@ -147,6 +147,17 @@ kSpawnConfig spawn_config_for_executable(const char* path, char *const argv[rest
 	return (kSpawnConfigInject | kSpawnConfigTrust);
 }
 
+
+int __posix_spawn_orig(pid_t *restrict pid, const char *restrict path, struct _posix_spawn_args_desc *desc, char *const argv[restrict], char *const envp[restrict])
+{
+	return __posix_spawn_inline(pid, path, desc, argv, envp);
+}
+
+int __execve_orig(const char *path, char *const argv[], char *const envp[])
+{
+	return __execve_inline(path, argv, envp);
+}
+
 // 1. Ensure the binary about to be spawned and all of it's dependencies are trust cached
 // 2. Insert "DYLD_INSERT_LIBRARIES=/usr/lib/systemhook.dylib" into all binaries spawned
 // 3. Increase Jetsam limit to more sane value (Multipler defined as JETSAM_MULTIPLIER)

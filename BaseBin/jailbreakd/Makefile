@@ -6,7 +6,7 @@ CFLAGS = -Werror -Wno-availability -framework Foundation -I../.include -I./src -
 LDFLAGS = -L../.build -ljailbreak -lbsm
 
 sign: $(TARGET)
-	@ldid -Sentitlements.plist $<
+	@ldid -Cadhoc -Sentitlements.plist $<
 
 $(TARGET): $(wildcard src/*.m src/*.c)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^

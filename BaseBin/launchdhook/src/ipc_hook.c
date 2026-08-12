@@ -44,6 +44,5 @@ if(isBlacklistedToken(&au)) {
 
 void initIPCHooks(void)
 {
-	sandbox_check_by_audit_token_orig = sandbox_check_by_audit_token;
-	litehook_rebind_symbol(LITEHOOK_REBIND_GLOBAL, sandbox_check_by_audit_token, (void *)sandbox_check_by_audit_token_hook, NULL);
+	MSHookFunction(sandbox_check_by_audit_token, (void *)sandbox_check_by_audit_token_hook, (void **)&sandbox_check_by_audit_token_orig);
 }

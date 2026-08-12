@@ -22,6 +22,5 @@ void initJetsamHook(void)
 {
 	memorystatus_control(MEMORYSTATUS_CMD_SET_JETSAM_TASK_LIMIT, 1, -1, NULL, 0);
 	memorystatus_control(MEMORYSTATUS_CMD_SET_JETSAM_HIGH_WATER_MARK, 1, -1, NULL, 0);
-	memorystatus_control_orig = memorystatus_control;
-	litehook_rebind_symbol(LITEHOOK_REBIND_GLOBAL, memorystatus_control, (void *)memorystatus_control_hook, NULL);
+	MSHookFunction(memorystatus_control, (void *)memorystatus_control_hook, (void **)&memorystatus_control_orig);
 }

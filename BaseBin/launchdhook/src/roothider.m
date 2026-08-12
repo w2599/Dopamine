@@ -7,8 +7,8 @@
 #include <libjailbreak/libjailbreak.h>
 #include <libjailbreak/roothider.h>
 
-#include "../systemhook/src/common.h"
-#include "../systemhook/src/envbuf.h"
+#include "../systemhook/src/common/common.h"
+#include "../systemhook/src/common/envbuf.h"
 
 const char* HOOK_DYLIB_PATH = NULL;
 
