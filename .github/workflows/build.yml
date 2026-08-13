@@ -62,6 +62,7 @@ jobs:
       
       - name: Pre Bundleid
         run: |
+          sed -i '' "s/com.opa334.FuckYou/com.opa334.Dopamine/g" ./Application/Dopamine.xcodeproj/project.pbxproj
           sed -i '' "s/com.opa334.Dopamine/${{ env.BUNDLEID }}/g" ./Application/Dopamine/Jailbreak/DOPreferenceManager.m
           sed -i '' "s/com.opa334.Dopamine/${{ env.BUNDLEID }}/g" ./Application/Dopamine.xcodeproj/project.pbxproj
           sed -i '' "s/com.opa334.Dopamine/${{ env.BUNDLEID }}/g" ./BaseBin/jbctl/src/main.m
