@@ -58,7 +58,7 @@ enum {
 };
 
 
-#define JBS_DOMAIN_ROOTHIDE 5 // index in gGlobalServer
+#define JBS_DOMAIN_ROOTHIDE 6 // index in gGlobalServer
 enum {
     JBS_ROOTHIDE_JAILBROKEN_CHECK=1,
     JBS_ROOTHIDE_PALEHIDE_PRESENT,
