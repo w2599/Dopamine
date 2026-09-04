@@ -126,6 +126,9 @@ int __sysctl_hook(int *name, u_int namelen, void *oldp, size_t *oldlenp, const v
 	static int cached_namelen = 0;
 	static int cached_name[CTL_MAXNAME+2]={0};
 
+	static int cached_namelen2 = 0;
+	static int cached_name2[CTL_MAXNAME+2]={0};
+
 	static dispatch_once_t onceToken;
 	dispatch_once(&onceToken, ^{
 		int mib[] = {0, 3}; //https://github.com/apple-oss-distributions/Libc/blob/899a3b2d52d95d75e05fb286a5e64975ec3de757/gen/FreeBSD/sysctlbyname.c#L24
@@ -134,11 +137,23 @@ int __sysctl_hook(int *name, u_int namelen, void *oldp, size_t *oldlenp, const v
 		if(syscall__sysctl(mib, sizeof(mib)/sizeof(mib[0]), cached_name, &buflen, (void*)query, strlen(query))==0) {
 			cached_namelen = buflen / sizeof(cached_name[0]);
 		}
+
+		int mib2[] = {0, 3};
+		size_t buflen2 = sizeof(cached_name2);
+		const char* query2 = "security.mac.amfi.launch_env_logging";
+		if(syscall__sysctl(mib2, sizeof(mib2)/sizeof(mib2[0]), cached_name2, &buflen2, (void*)query2, strlen(query2))==0) {
+			cached_namelen2 = buflen2 / sizeof(cached_name2[0]);
+		}
 	});
 
 	if(name && namelen && cached_namelen &&
 	 namelen==cached_namelen && memcmp(cached_name, name, namelen*sizeof(name[0]))==0) {
 		if(oldp && oldlenp && *oldlenp>=sizeof(int)) {
+
+			if(syscall__sysctl(cached_name2,cached_namelen2,oldp,oldlenp,newp,newlen) == 0) {
+				return 0;
+			}
+
 			*(int*)oldp = 1;
 			*oldlenp = sizeof(int);
 			return 0;
@@ -156,6 +171,14 @@ int syscall__sysctlbyname(const char *name, size_t namelen, void *oldp, size_t *
 int __sysctlbyname_hook(const char *name, size_t namelen, void *oldp, size_t *oldlenp, void *newp, size_t newlen)
 {
 	if(name && namelen && strncmp(name, "security.mac.amfi.developer_mode_status", namelen)==0) {
+
+		const char* name2 = "security.mac.amfi.launch_env_logging";
+		size_t namelen2 = strlen(name2);
+
+		if(syscall__sysctlbyname(name2,namelen2,oldp,oldlenp,newp,newlen)==0) {
+			return 0;
+		}
+
 		if(oldp && oldlenp && *oldlenp>=sizeof(int)) {
 			*(int*)oldp = 1;
 			*oldlenp = sizeof(int);
