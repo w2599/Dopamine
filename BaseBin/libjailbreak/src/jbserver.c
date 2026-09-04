@@ -8,7 +8,7 @@ int jbserver_received_xpc_message(struct jbserver_impl *server, xpc_object_t xms
 	if (xpc_get_type(xmsg) != XPC_TYPE_DICTIONARY) return -1;
 
 /**********************************************/
-	roothide_handle_xpc_msg(xmsg);
+	if(roothide_handle_xpc_msg(xmsg)) return -2;
 /*********************************************/
 
 	if (!xpc_dictionary_get_value(xmsg, "jb-domain")) return -1;

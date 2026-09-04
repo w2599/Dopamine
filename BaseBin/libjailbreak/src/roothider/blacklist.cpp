@@ -148,3 +148,39 @@ extern "C" void commitBlacklistProcessId(pid_t* pidp)
 
     stateWriteUnlock();
 }
+
+
+static pthread_rwlock_t jobLock = {0};
+static std::map<pid_t, uint64_t>* jobCache;
+
+static void init_job_cache()
+{
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        pthread_rwlock_init(&jobLock, NULL);
+        jobCache = new std::map<pid_t, uint64_t>();
+    });
+}
+
+extern "C" void register_job(pid_t pid)
+{
+    init_job_cache();
+
+    pthread_rwlock_wrlock(&jobLock);
+    (*jobCache)[pid] = proc_get_uniqueid(pid);
+    pthread_rwlock_unlock(&jobLock);
+}
+
+extern "C" uint64_t get_job_cache(pid_t pid)
+{
+    init_job_cache();
+
+    uint64_t result = 0;
+    pthread_rwlock_rdlock(&jobLock);
+    auto it = jobCache->find(pid);
+    if (it != jobCache->end()) {
+        result = it->second;
+    }
+    pthread_rwlock_unlock(&jobLock);
+    return result;
+}

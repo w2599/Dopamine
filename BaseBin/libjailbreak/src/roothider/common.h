@@ -20,6 +20,7 @@ int proc_fix_spinlock(pid_t pid);
 int proc_patch_csflags(pid_t pid);
 pid_t proc_get_ppid(pid_t pid);
 int proc_get_pidversion(pid_t pid);
+uint64_t proc_get_uniqueid(pid_t pid);
 int proc_paused(pid_t pid, bool* paused);
 char* proc_get_path(pid_t pid, char buffer[PATH_MAX]);
 char* proc_get_identifier(pid_t pid, char buffer[255]);
@@ -34,6 +35,9 @@ bool isBlacklistedPid(pid_t pid);
 
 pid_t* allocBlacklistProcessId();
 void commitBlacklistProcessId(pid_t* pidp);
+
+void register_job(pid_t pid);
+uint64_t get_job_cache(pid_t pid);
 
 bool isRemovableBundlePath(const char* path);
 bool isSubPathOf(const char* parent, const char* child);
@@ -68,7 +72,7 @@ void hideDeveloperMode();
 void exec_set_patch(bool enabled);
 int exec_cmd_roothide_spawn(pid_t* pidp, const char* path, const posix_spawn_file_actions_t *fap, const posix_spawnattr_t *attrp, char *const argv[], char *const envp[]);
 
-void roothide_handle_xpc_msg(xpc_object_t xmsg);
+bool roothide_handle_xpc_msg(xpc_object_t xmsg);
 
 void loadAppStoredIdentifiers();
 

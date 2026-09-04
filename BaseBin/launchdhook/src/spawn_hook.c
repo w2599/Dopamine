@@ -77,6 +77,10 @@ if (!pid) pid = &pidval;
 
 JBLogDebug("__posix_spawn ret=%d pid=%d", r, *pid);
 
+if(r == 0) {
+	register_job(*pid);
+}
+
 	return r;
 }
 

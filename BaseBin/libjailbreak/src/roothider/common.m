@@ -91,6 +91,15 @@ int proc_get_pidversion(pid_t pid)
 	}
 	return uniqidinfo.p_idversion;
 }
+uint64_t proc_get_uniqueid(pid_t pid)
+{
+	struct proc_uniqidentifierinfo uniqidinfo = {0};
+	int ret = proc_pidinfo(pid, PROC_PIDUNIQIDENTIFIERINFO, 0, &uniqidinfo, sizeof(uniqidinfo));
+	if (ret <= 0) {
+        return 0;
+	}
+	return uniqidinfo.p_uniqueid;
+}
 
 char* proc_get_identifier(pid_t pid, char buffer[255])
 {
