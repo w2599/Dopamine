@@ -186,7 +186,7 @@ int jbclient_trust_library_recurse(const char *libraryPath, void *addressInCalle
 		return -1;
 	}
 	
-	if(libraryPath[0] != '@') {
+	if(libraryPath[0] == '/') {
 		if(access(libraryPath, F_OK) != 0) {
 			return -3;
 		}
