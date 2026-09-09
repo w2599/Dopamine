@@ -3,6 +3,8 @@
 
 int jbsettings_get(const char *key, xpc_object_t *valueOut)
 {
+	if (!key)	return -1;
+
 	if (!strcmp(key, "markAppsAsDebugged")) {
 		*valueOut = xpc_bool_create(jbsetting(markAppsAsDebugged));
 		return 0;
