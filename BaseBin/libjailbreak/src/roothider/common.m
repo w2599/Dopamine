@@ -347,7 +347,7 @@ bool hasTrollstoreLiteMarker(const char* path)
 	return ret==0;
 }
 
-bool isSubPathOf(const char* child, const char* parent)
+bool isSubPathOf(const char* child, const char* parent) //not work for jbroot:/var/...
 {
 	char real_child[PATH_MAX]={0};
 	char real_parent[PATH_MAX]={0};
@@ -795,11 +795,11 @@ int ensure_dyld_trustcache(const char* path)
     return 0;
 }
 
-NSMutableArray<NSString*>* StoredAppIdentifiers = nil;
+NSMutableSet<NSString*>* StoredAppIdentifiers = nil;
 
 void loadAppStoredIdentifiers()
 {
-    StoredAppIdentifiers = [[NSMutableArray alloc] init];
+    StoredAppIdentifiers = [[NSMutableSet alloc] init];
 
     NSFileManager *fileManager = [NSFileManager defaultManager];
     NSString *applicationsPath = @"/private/var/containers/Bundle/Application/";
@@ -952,14 +952,12 @@ bool is_sensitive_app_identifier(const char* identifier)
 
 bool is_safe_bundle_identifier(const char* identifier)
 {
-    if(!identifier || !*identifier) return false;
+    //don't touch
+    if(!identifier || !*identifier) identifier="";
 
-    /* ios15 /System/Library/LaunchDaemons/com.apple.tvremoted.plist */
-    if(strcmp(identifier, "$(PRODUCT_BUNDLE_IDENTIFIER)")==0) {
-        return true;
-    }
-
-    if(string_has_prefix(identifier, "lockdown.") && strstr(identifier, ".com.apple.")) {
+    //don't touch
+    assert(StoredAppIdentifiers != nil);
+    if([StoredAppIdentifiers containsObject:@(identifier)]) {
         return true;
     }
 
@@ -976,8 +974,12 @@ bool is_safe_bundle_identifier(const char* identifier)
         return false;
     }
 
-    assert(StoredAppIdentifiers != nil);
-    if([StoredAppIdentifiers containsObject:@(identifier)]) {
+    /* ios15 /System/Library/LaunchDaemons/com.apple.tvremoted.plist */
+    if(strcmp(identifier, "$(PRODUCT_BUNDLE_IDENTIFIER)")==0) {
+        return true;
+    }
+
+    if(string_has_prefix(identifier, "lockdown.") && strstr(identifier, ".com.apple.")) {
         return true;
     }
 
