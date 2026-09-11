@@ -8,6 +8,8 @@ extern bool launchdhookFirstLoad;
 /* as abort_with_* causes a SIGABRT, we need to use this instead */
 void launchd_panic(const char* fmt, ...);
 
+int setBasebinDependency(bool present);
+
 bool dyld_patch_enabled();
 bool process_force_dyld_patch(const char* path, const char** argv);
 int roothide_config_set_spinlock_fix(bool enabled);

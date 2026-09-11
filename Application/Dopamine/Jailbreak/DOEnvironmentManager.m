@@ -441,6 +441,9 @@ int reboot3(uint64_t flags, ...);
                 else {
                     [[NSData data] writeToFile:safeModePath atomically:YES];
                 }
+/*************************** roothide specific *******************/
+                setBasebinDependency(enabled);
+/*************************** roothide specific *******************/
             }];
         }];
     }

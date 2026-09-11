@@ -1006,3 +1006,11 @@ int wait_for_exit(pid_t pid)
     }
 }
 
+int setBasebinDependency(bool present)
+{
+    if(present) {
+        return symlink(JBROOT_PATH("/Library/Frameworks"), JBROOT_PATH("/basebin/present"));
+    } else {
+        return unlink(JBROOT_PATH("/basebin/present"));
+    }
+}

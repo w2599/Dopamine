@@ -28,6 +28,10 @@ static int watchdog_intercept_userspace_panic(const char *panicMessage)
 	setenv("WATCHDOG_PANIC_MESSAGE", panicMessage, 1);
 	FILE *touchFile = fopen(JBROOT_PATH("/basebin/.safe_mode"), "w");
 	fclose(touchFile);
+	
+/*************************** roothide specific *******************/
+	setBasebinDependency(false);
+/*************************** roothide specific *******************/
 
 	return 0;
 }
