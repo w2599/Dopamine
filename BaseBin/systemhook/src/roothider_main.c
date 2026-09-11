@@ -296,10 +296,11 @@ int roothide_systemhook___posix_spawn_posthook(pid_t *restrict pidp, const char 
 		}
 	}
 
-	int pid = 0;
-	int ret = __posix_spawn_orig(&pid, path, desc, argv, envc);
-	if (pidp) *pidp = pid;
-
+	pid_t pidval = 0;
+	if (!pidp) pidp = &pidval;
+	int ret = __posix_spawn_orig(pidp, path, desc, argv, envc);
+	pid_t pid = *pidp;
+	
 	envbuf_free(envc);
 
 	// maybe caller will use it again? restore flags

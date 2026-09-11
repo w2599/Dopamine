@@ -249,9 +249,10 @@ int roothide_launchd___posix_spawn_posthook(pid_t *restrict pidp, const char *re
 	}
 #endif
 
-	int pid = 0;
-	int ret = __posix_spawn_orig_wrapper(&pid, path, desc, argv, envc);
-	if(pidp) *pidp = pid;
+	pid_t pidval = 0;
+	if (!pidp) pidp = &pidval;
+	int ret = __posix_spawn_orig_wrapper(pidp, path, desc, argv, envc);
+	pid_t pid = *pidp;
 
 	envbuf_free(envc);
 	
@@ -286,9 +287,10 @@ int roothide_launchd___posix_spawn__spinlock_fix_only(pid_t *restrict pidp, cons
 
 	posix_spawnattr_setflags(attrp, flags | POSIX_SPAWN_START_SUSPENDED);
 
-	int pid = 0;
-	int ret = __posix_spawn_orig_wrapper(&pid, path, desc, argv, envp);
-	if(pidp) *pidp = pid;
+	pid_t pidval = 0;
+	if (!pidp) pidp = &pidval;
+	int ret = __posix_spawn_orig_wrapper(pidp, path, desc, argv, envp);
+	pid_t pid = *pidp;
 	
 	posix_spawnattr_setflags(attrp, flags); // maybe caller will use it again?
 
