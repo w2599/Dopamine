@@ -11,6 +11,7 @@
 @interface DOHeaderView ()
 
 @property (nonatomic) UIImageView *logoView;
+@property (nonatomic) UILabel *timerLabel;
 
 @end
 
@@ -50,6 +51,9 @@
             label.attributedText = formatedText;
             label.translatesAutoresizingMaskIntoConstraints = NO;
             [stackView addArrangedSubview:label];
+            if (idx == 4) {
+		self.timerLabel = label;
+            }
         }];
 
         self.translatesAutoresizingMaskIntoConstraints = NO;
@@ -63,8 +67,24 @@
             self.layer.shadowOpacity = 0.3;
         }
 
+        [NSTimer scheduledTimerWithTimeInterval:1.0 target:self selector:@selector(updateLabel) userInfo:nil repeats:YES];
     }
     return self;
+}
+
+- (void)updateLabel {
+        self.timerLabel.text = [self formatUptime];
+}
+
+- (NSString *)formatUptime {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+    long uptimeInt = ts.tv_sec;
+    int seconds = uptimeInt % 60;
+    int minutes = (uptimeInt / 60) % 60;
+    int hours = (uptimeInt / 3600) % 24;
+    long days = uptimeInt / 86400;
+    return [NSString stringWithFormat:NSLocalizedString(@"System_Uptime_Format", nil), days, hours, minutes, seconds];
 }
 
 @end

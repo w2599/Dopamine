@@ -172,7 +172,7 @@
         
         PSSpecifier *headerSpecifier = [PSSpecifier emptyGroupSpecifier];
         [headerSpecifier setProperty:@"DOHeaderCell" forKey:@"headerCellClass"];
-        [headerSpecifier setProperty:[NSString stringWithFormat:@"Settings"] forKey:@"title"];
+        [headerSpecifier setProperty:[NSString stringWithFormat:DOLocalizedString(@"Menu_Settings_Title")] forKey:@"title"];
         [specifiers addObject:headerSpecifier];
         
         if (envManager.isSupported) {
@@ -226,9 +226,9 @@
                 }
             }
             
-            PSSpecifier *settingsGroupSpecifier = [PSSpecifier emptyGroupSpecifier];
-            settingsGroupSpecifier.name = DOLocalizedString(@"Section_Jailbreak_Settings");
-            [specifiers addObject:settingsGroupSpecifier];
+            // PSSpecifier *settingsGroupSpecifier = [PSSpecifier emptyGroupSpecifier];
+            // settingsGroupSpecifier.name = DOLocalizedString(@"Section_Jailbreak_Settings");
+            // [specifiers addObject:settingsGroupSpecifier];
             
             PSSpecifier *tweakInjectionSpecifier = [PSSpecifier preferenceSpecifierNamed:DOLocalizedString(@"Settings_Tweak_Injection") target:self set:@selector(setTweakInjectionEnabled:specifier:) get:@selector(readTweakInjectionEnabled:) detail:nil cell:PSSwitchCell edit:nil];
             [tweakInjectionSpecifier setProperty:@YES forKey:@"enabled"];
@@ -244,18 +244,18 @@
                 [specifiers addObject:verboseLogSpecifier];
             }
             
-            PSSpecifier *idownloadSpecifier = [PSSpecifier preferenceSpecifierNamed:DOLocalizedString(@"Settings_iDownload") target:self set:@selector(setIDownloadEnabled:specifier:) get:@selector(readIDownloadEnabled:) detail:nil cell:PSSwitchCell edit:nil];
-            [idownloadSpecifier setProperty:@YES forKey:@"enabled"];
-            [idownloadSpecifier setProperty:@"idownloadEnabled" forKey:@"key"];
-            [idownloadSpecifier setProperty:@NO forKey:@"default"];
-            [specifiers addObject:idownloadSpecifier];
+            // PSSpecifier *idownloadSpecifier = [PSSpecifier preferenceSpecifierNamed:DOLocalizedString(@"Settings_iDownload") target:self set:@selector(setIDownloadEnabled:specifier:) get:@selector(readIDownloadEnabled:) detail:nil cell:PSSwitchCell edit:nil];
+            // [idownloadSpecifier setProperty:@YES forKey:@"enabled"];
+            // [idownloadSpecifier setProperty:@"idownloadEnabled" forKey:@"key"];
+            // [idownloadSpecifier setProperty:@NO forKey:@"default"];
+            // [specifiers addObject:idownloadSpecifier];
             
             PSSpecifier *appJitSpecifier = [PSSpecifier preferenceSpecifierNamed:DOLocalizedString(@"Settings_Apps_JIT") target:self set:@selector(setAppJITEnabled:specifier:) get:@selector(readAppJITEnabled:) detail:nil cell:PSSwitchCell edit:nil];
             [appJitSpecifier setProperty:@YES forKey:@"enabled"];
             [appJitSpecifier setProperty:@"appJITEnabled" forKey:@"key"];
             [appJitSpecifier setProperty:@YES forKey:@"default"];
             [specifiers addObject:appJitSpecifier];
-            
+
             PSSpecifier *disableUpdateSpecifier = [PSSpecifier preferenceSpecifierNamed:DOLocalizedString(@"Settings_Disable_Update") target:self set:defSetter get:defGetter detail:nil cell:PSSwitchCell edit:nil];
             [disableUpdateSpecifier setProperty:@YES forKey:@"enabled"];
             [disableUpdateSpecifier setProperty:@"disableUpdateEnabled" forKey:@"key"];
@@ -352,9 +352,9 @@
             }
         }
         
-        PSSpecifier *themingGroupSpecifier = [PSSpecifier emptyGroupSpecifier];
-        themingGroupSpecifier.name = DOLocalizedString(@"Section_Customization");
-        [specifiers addObject:themingGroupSpecifier];
+        // PSSpecifier *themingGroupSpecifier = [PSSpecifier emptyGroupSpecifier];
+        // themingGroupSpecifier.name = DOLocalizedString(@"Section_Customization");
+        // [specifiers addObject:themingGroupSpecifier];
         
         PSSpecifier *themeSpecifier = [PSSpecifier preferenceSpecifierNamed:DOLocalizedString(@"Theme") target:self set:defSetter get:defGetter detail:nil cell:PSLinkListCell edit:nil];
         themeSpecifier.detailControllerClass = [DOPSListItemsController class];
@@ -396,6 +396,7 @@
             }
         }
 
+        
         if (envManager.isJailbroken) {
             PSSpecifier *mountSpecifier = [PSSpecifier preferenceSpecifierNamed:@"" target:self set:defSetter get:defGetter detail:nil cell:PSStaticTextCell edit:nil];
             [mountSpecifier setProperty:@"Input_Mmount_Title" forKey:@"title"];
@@ -413,6 +414,18 @@
             [unmountSpecifier setProperty:@"unmountPressed" forKey:@"action"];
             [specifiers addObject:unmountSpecifier];
         }
+
+        PSSpecifier *spaceGroupSpecifier = [PSSpecifier emptyGroupSpecifier];
+        [specifiers addObject:spaceGroupSpecifier];
+        
+        PSSpecifier *rebootSpecifier = [PSSpecifier preferenceSpecifierNamed:@"" target:self set:defSetter get:defGetter detail:nil cell:PSStaticTextCell edit:nil];
+        [rebootSpecifier setProperty:@"Button_Reboot" forKey:@"title"];
+        [rebootSpecifier setProperty:[DOButtonCell class] forKey:@"cellClass"];
+        [rebootSpecifier setProperty:buttonHeight forKey:@"height"];
+        [rebootSpecifier setProperty:@"arrow.triangle.2.circlepath" forKey:@"image"];
+        [rebootSpecifier setProperty:@"rebootPressed" forKey:@"action"];
+    	    [specifiers addObject:rebootSpecifier];
+        
 
         _specifiers = specifiers;
     }
@@ -913,6 +926,28 @@
     [[DOUIManager sharedInstance] resetSettings];
     [self.navigationController popToRootViewControllerAnimated:YES];
     [self reloadSpecifiers];
+}
+
+- (void)rebootPressed
+{
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:DOLocalizedString(@"Button_Reboot")
+                                                                   message:DOLocalizedString(@"Update_Status_Subtitle_Restart_Soon")
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    
+    UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Cancel")
+                                                             style:UIAlertActionStyleCancel
+                                                           handler:nil];
+    
+    UIAlertAction *rebootAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Reboot")
+                                                             style:UIAlertActionStyleDestructive
+                                                           handler:^(UIAlertAction * _Nonnull action) {
+        exec_cmd_root(JBROOT_PATH("/sbin/reboot"), NULL);
+    }];
+    
+    [alert addAction:cancelAction];
+    [alert addAction:rebootAction];
+    
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 

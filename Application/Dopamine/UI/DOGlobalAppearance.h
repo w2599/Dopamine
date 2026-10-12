@@ -29,7 +29,7 @@ NS_ASSUME_NONNULL_BEGIN
 + (UIButtonConfiguration *)defaultButtonConfiguration;
 + (UIButtonConfiguration *)defaultButtonConfigurationWithImagePadding:(CGFloat)imagePadding;
 + (NSAttributedString*)mainSubtitleString:(NSString*)string;
-+ (NSAttributedString*)secondarySubtitleString:(NSString*)string;
++ (NSAttributedString*)secondarySubtitleString:(NSString*)string withAlpha:(CGFloat)alpha;
 + (BOOL)isHomeButtonDevice;
 + (UIColor*)windowColorWithAlpha:(float)alpha;
 + (BOOL)isRTL;
