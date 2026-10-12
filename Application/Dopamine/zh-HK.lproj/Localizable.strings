@@ -123,3 +123,5 @@
 "Select_Package_Managers_Install_Message" = "若不確定如何選擇，請使用 Sileo";
 "Continue" = "繼續";
 
+
+"Settings_Disable_Update" = "禁止更新檢測";
