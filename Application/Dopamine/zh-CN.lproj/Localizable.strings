@@ -136,3 +136,5 @@
 "Button_View" = "Filza查看";
 "Button_Mount" = "确定";
 
+
+"Settings_Disable_Update" = "禁用更新检测";
