@@ -6,6 +6,12 @@ on:
 env:
   VERSION: '2.0.11'
   BUNDLEID: 'com.zqbb.Dopamine'
+  THEOS: ${{ github.workspace }}/theos
+  THEOS_SDK_VERSION: '16.5'
+  # 修改此版本可主动刷新编译环境缓存。
+  BUILD_CACHE_VERSION: 'v1'
+  HOMEBREW_NO_AUTO_UPDATE: '1'
+  HOMEBREW_NO_INSTALL_CLEANUP: '1'
 
 jobs:
   build:
@@ -21,44 +27,142 @@ jobs:
         with:
             submodules: recursive
 
+      - name: Prepare cache keys
+        id: cache-info
+        run: |
+          echo "macos=$(sw_vers -productVersion)" >> "$GITHUB_OUTPUT"
+          echo "month=$(date -u +'%Y-%m')" >> "$GITHUB_OUTPUT"
+          mkdir -p .ci-cache
+
+      - name: Restore Procursus environment
+        id: procursus-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .ci-cache/procursus.tar.zst
+          key: procursus-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache-info.outputs.macos }}-${{ env.BUILD_CACHE_VERSION }}-${{ steps.cache-info.outputs.month }}
+
+      - name: Extract Procursus environment
+        if: steps.procursus-cache.outputs.cache-hit == 'true'
+        run: |
+          sudo mkdir -p /opt
+          zstd -dc .ci-cache/procursus.tar.zst | sudo tar -xpf - -C /opt
+
       - name: Install Procursus
+        if: steps.procursus-cache.outputs.cache-hit != 'true'
         uses: dhinakg/procursus-action@main
         with:
-          packages: ldid findutils sed coreutils make
+          # 已缓存完整环境，避免 action 再缓存一份未安装工具的 bootstrap。
+          cache: 'false'
+          packages: ldid findutils sed coreutils make xz-utils
 
-      - name: Install better GNU Make
+      - name: Configure Procursus environment
         run: |
-          brew install make
-          echo "PATH=$(brew --prefix make)/libexec/gnubin:$PATH" >> $GITHUB_ENV
+          for procursus_path in games sbin bin local/sbin local/bin; do
+            echo "/opt/procursus/$procursus_path" >> "$GITHUB_PATH"
+          done
+          echo "CPATH=/opt/procursus/include${CPATH:+:$CPATH}" >> "$GITHUB_ENV"
+          echo "LIBRARY_PATH=/opt/procursus/lib${LIBRARY_PATH:+:$LIBRARY_PATH}" >> "$GITHUB_ENV"
+
+      - name: Archive Procursus environment
+        if: steps.procursus-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo tar -cpf - -C /opt procursus | zstd -T0 -3 -o .ci-cache/procursus.tar.zst
+
+      - name: Save Procursus environment
+        if: steps.procursus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .ci-cache/procursus.tar.zst
+          key: ${{ steps.procursus-cache.outputs.cache-primary-key }}
+
+      - name: Restore Homebrew downloads
+        id: brew-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/Library/Caches/Homebrew/downloads
+          key: brew-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache-info.outputs.macos }}-${{ env.BUILD_CACHE_VERSION }}-${{ steps.cache-info.outputs.month }}
+
+      - name: Install Homebrew dependencies
+        run: |
+          for formula in make libarchive openssl@3; do
+            if ! brew list --versions "$formula" >/dev/null 2>&1; then
+              brew install "$formula"
+            fi
+          done
+          echo "$(brew --prefix make)/libexec/gnubin" >> "$GITHUB_PATH"
+
+      - name: Save Homebrew downloads
+        if: steps.brew-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/Library/Caches/Homebrew/downloads
+          key: ${{ steps.brew-cache.outputs.cache-primary-key }}
+
+      - name: Restore Theos and SDK
+        id: theos-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: theos
+          key: theos-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache-info.outputs.macos }}-sdk${{ env.THEOS_SDK_VERSION }}-${{ env.BUILD_CACHE_VERSION }}-${{ steps.cache-info.outputs.month }}
 
       - name: Install THEOS
+        if: steps.theos-cache.outputs.cache-hit != 'true'
         run: |
           set -x
-          export BASEDIR="$(pwd)"
-          export THEOS="${BASEDIR}/theos"
-          mkdir -p $THEOS
-          curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos >> install-theos.sh
-          gsed -E "/^\s*get_theos\s*$/,+1 s/^(\s*)(get_sdks)\s*$/\1mkdir -p \${THEOS}\/sdks\n\1touch \${THEOS}\/sdks\/sdk\n\1\2/g" -i install-theos.sh
-          bash install-theos.sh
-          curl -L https://github.com/theos/sdks/releases/latest/download/iPhoneOS16.5.sdk.tar.xz --output $THEOS/sdks/iPhoneOS16.5.sdk.tar.xz
-          gunzip $THEOS/sdks/iPhoneOS16.5.sdk.tar.xz
-          tar -xf $THEOS/sdks/iPhoneOS16.5.sdk.tar -C $THEOS/sdks
-          rm $THEOS/sdks/iPhoneOS16.5.sdk.tar
-          cd $BASEDIR
+          # 依赖已准备好，直接克隆可避免安装器再次执行 apt update。
+          git clone --recursive --depth 1 --shallow-submodules https://github.com/theos/theos.git "$THEOS"
+          mkdir -p "$THEOS/sdks"
+          sdk_archive="$RUNNER_TEMP/iPhoneOS${THEOS_SDK_VERSION}.sdk.tar.xz"
+          curl -fL --retry 3 "https://github.com/theos/sdks/releases/latest/download/iPhoneOS${THEOS_SDK_VERSION}.sdk.tar.xz" --output "$sdk_archive"
+          tar -xJf "$sdk_archive" -C "$THEOS/sdks"
+          rm "$sdk_archive"
 
-      - name: Build and Install trustcache
+      - name: Verify Theos environment
+        run: |
+          test -f "$THEOS/makefiles/common.mk"
+          test -d "$THEOS/sdks/iPhoneOS${THEOS_SDK_VERSION}.sdk"
+
+      - name: Save Theos and SDK
+        if: steps.theos-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: theos
+          key: ${{ steps.theos-cache.outputs.cache-primary-key }}
+
+      - name: Get trustcache dependency version
+        id: trustcache-info
+        run: |
+          echo "openssl=$(brew list --versions openssl@3 | tr ' ' '-')" >> "$GITHUB_OUTPUT"
+
+      - name: Restore trustcache tool
+        id: trustcache-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .ci-cache/bin/trustcache
+          key: trustcache-${{ runner.os }}-${{ runner.arch }}-${{ steps.cache-info.outputs.macos }}-${{ steps.trustcache-info.outputs.openssl }}-${{ env.BUILD_CACHE_VERSION }}-${{ steps.cache-info.outputs.month }}
+
+      - name: Build trustcache
+        if: steps.trustcache-cache.outputs.cache-hit != 'true'
         run: |
           set -x
-          git clone https://github.com/CRKatri/trustcache
+          git clone --depth 1 https://github.com/CRKatri/trustcache
           cd trustcache
-          export CFLAGS="$CFLAGS -I$(brew --prefix openssl)/include -arch arm64"
-          export LDFLAGS="$LDFLAGS -L$(brew --prefix openssl)/lib -arch arm64"
+          export CFLAGS="${CFLAGS:-} -I$(brew --prefix openssl@3)/include -arch $(uname -m)"
+          export LDFLAGS="${LDFLAGS:-} -L$(brew --prefix openssl@3)/lib -arch $(uname -m)"
           gmake -j$(sysctl -n hw.logicalcpu) OPENSSL=1
-          sudo cp trustcache /opt/procursus/bin/
+          mkdir -p "$GITHUB_WORKSPACE/.ci-cache/bin"
+          cp trustcache "$GITHUB_WORKSPACE/.ci-cache/bin/trustcache"
 
-      - name: Install libarchive
+      - name: Save trustcache tool
+        if: steps.trustcache-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .ci-cache/bin/trustcache
+          key: ${{ steps.trustcache-cache.outputs.cache-primary-key }}
+
+      - name: Install trustcache tool
         run: |
-          brew install libarchive
+          sudo install -m 755 .ci-cache/bin/trustcache /opt/procursus/bin/trustcache
       
       - name: Pre Bundleid
         run: |
@@ -119,11 +223,33 @@ jobs:
         run: |
           # sudo xcode-select --switch /Applications/Xcode_14.3.app
 
+      - name: Restore Bootstraps
+        id: bootstrap-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            Application/Dopamine/Resources/bootstrap_1800.tar.zst
+            Application/Dopamine/Resources/bootstrap_1900.tar.zst
+          key: bootstraps-${{ env.BUILD_CACHE_VERSION }}-${{ steps.cache-info.outputs.month }}-${{ hashFiles('Application/Dopamine/Resources/download_bootstraps.sh') }}
+
       - name: Pre Bootstraps
+        if: steps.bootstrap-cache.outputs.cache-hit != 'true'
         run: |
-          # set -x
           cd Application/Dopamine/Resources
           ./download_bootstraps.sh
+
+      - name: Verify Bootstraps
+        run: |
+          zstd -t Application/Dopamine/Resources/bootstrap_1800.tar.zst Application/Dopamine/Resources/bootstrap_1900.tar.zst
+
+      - name: Save Bootstraps
+        if: steps.bootstrap-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            Application/Dopamine/Resources/bootstrap_1800.tar.zst
+            Application/Dopamine/Resources/bootstrap_1900.tar.zst
+          key: ${{ steps.bootstrap-cache.outputs.cache-primary-key }}
 
       - name: Pre Fix
         run: |
@@ -132,8 +258,6 @@ jobs:
       - name: Build tipa
         run: |
           # set -x
-          export BASEDIR="$(pwd)"
-          export THEOS="${BASEDIR}/theos"
           gmake -j$(sysctl -n hw.physicalcpu) NIGHTLY=1
           # cp Dopamine/Dopamine.tipa Dopamine.tipa
           mv Application/Dopamine.tipa Dopamine_blacklist_${{ env.newVERSION }}_${{ env.commitCount }}_${{ env.msT }}_${{ env.SHASH }}.ipa
