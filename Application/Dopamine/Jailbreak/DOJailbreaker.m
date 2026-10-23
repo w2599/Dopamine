@@ -6,6 +6,7 @@
 //
 
 #import "DOJailbreaker.h"
+#import "DORuntimeConfiguration.h"
 #import "DOEnvironmentManager.h"
 #import "DOExploitManager.h"
 #import "DOUIManager.h"
@@ -704,6 +705,12 @@ void *boomerang_server(struct boomerang_info *info)
         return;
     }
 
+    *errOut = [DORuntimeConfiguration prepare];
+    if (*errOut) {
+        [self cleanUpPostExploitation];
+        return;
+    }
+
     [[DOUIManager sharedInstance] sendLog:DOLocalizedString(@"Initializing Environment") debug:NO];
     *errOut = [self injectLaunchdHook];
     if (*errOut) {
@@ -771,6 +778,12 @@ setenv("DYLD_INSERT_LIBRARIES", JBROOT_PATH("/basebin/systemhook.dylib"), 1);
         return;
     }
     
+    *errOut = [DORuntimeConfiguration restoreCustomMounts];
+    if (*errOut) {
+        [self cleanUpPostExploitation];
+        return;
+    }
+
     [[DOEnvironmentManager sharedManager] setIDownloadEnabled:idownloadEnabled needsUnsandbox:NO];
     
 /*
