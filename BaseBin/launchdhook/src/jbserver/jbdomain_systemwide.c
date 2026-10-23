@@ -255,8 +255,9 @@ int systemwide_process_checkin(audit_token_t *processToken, char **rootPathOut, 
 		}
 	}
 
-	bool fullyDebugged = false;
-	if (isRemovableBundlePath(procPath) || isSubPathOf(procPath, JBROOT_PATH("/Applications"))) {
+	// 越狱目录应用始终完整调试，普通应用仍遵循开关。
+	bool fullyDebugged = isSubPathOf(procPath, JBROOT_PATH("/Applications"));
+	if (isRemovableBundlePath(procPath)) {
 /*************************************** roothide specific *********************************/
 		
 		// This is an app, enable CS_DEBUGGED based on user preference
