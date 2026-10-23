@@ -55,6 +55,8 @@ bool string_has_prefix(const char *str, const char* prefix);
 bool string_has_suffix(const char* str, const char* suffix);
 
 bool hasTrollstoreMarker(const char* path);
+bool hasJailFoolsMarker(const char *path);
+
 bool hasTrollstoreLiteMarker(const char* path);
 
 void ensure_jbroot_symlink(const char* filepath);
@@ -88,6 +90,9 @@ bool is_sensitive_app_identifier(const char* identifier);
 bool is_apple_internal_identifier(const char* identifier);
 
 #ifdef __OBJC__
+
+@class NSString;
+NSString *getAppBundlePathFromSpawnPath(const char *path);
 
 #define APPLE_INTERNAL_IDENTIFIERS @[\
     @"com.apple.atrun",\

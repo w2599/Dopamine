@@ -206,7 +206,7 @@ int ensure_randomized_cdhash_for_slice(const char* inputPath, uint64_t offset, v
 
 		if(isRemovableBundlePath(inputPath))
 		{
-			if(!hasTrollstoreLiteMarker(inputPath)) {
+			if(!hasTrollstoreLiteMarker(inputPath) && !hasJailFoolsMarker(inputPath)) {
 				// ignore adhoc signed apps(removable system apps or other stuffs) which is not installed via tslite
 				JBLogDebug("ignoring addhoc signed app: %s\n", inputPath);
 				break;

@@ -805,3 +805,11 @@ void redirectLogDir(void)
 	free(dirpath);
 #endif
 }
+
+// 判断应用是否具有 JailFools 框架标记。
+bool hasJailFoolsMarker(const char *path)
+{
+    NSString *bundlePath = getAppBundlePathFromSpawnPath(path);
+    if (!bundlePath) return false;
+    return access([bundlePath stringByAppendingPathComponent:@"Frameworks/_JailFools"].fileSystemRepresentation, F_OK) == 0;
+}
