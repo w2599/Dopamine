@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A25990010000000000000001 /* DORuntimeConfiguration.m in Sources */ = {isa = PBXBuildFile; fileRef = A25990010000000000000002 /* DORuntimeConfiguration.m */; };
 		040622AA2B77FE8E00393AAD /* DOPkgManagerPickerViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 040622A92B77FE8E00393AAD /* DOPkgManagerPickerViewController.m */; };
 		042479A22B66916B0082581B /* DOCreditsViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 0424796B2B66916B0082581B /* DOCreditsViewController.m */; };
 		042479A32B66916B0082581B /* DOSettingsController.m in Sources */ = {isa = PBXBuildFile; fileRef = 0424796C2B66916B0082581B /* DOSettingsController.m */; };
@@ -386,6 +387,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+        A25990010000000000000002 /* DORuntimeConfiguration.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DORuntimeConfiguration.m; sourceTree = "<group>"; };
+        A25990010000000000000003 /* DORuntimeConfiguration.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DORuntimeConfiguration.h; sourceTree = "<group>"; };
 		040622A82B77FE8E00393AAD /* DOPkgManagerPickerViewController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DOPkgManagerPickerViewController.h; sourceTree = "<group>"; };
 		040622A92B77FE8E00393AAD /* DOPkgManagerPickerViewController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = DOPkgManagerPickerViewController.m; sourceTree = "<group>"; };
 		042479682B66916B0082581B /* DOJailbreakButton.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DOJailbreakButton.h; sourceTree = "<group>"; };
@@ -1073,6 +1076,8 @@
 				8CB4087C301FFB050097E18B /* clock_alarm.c */,
 				8C029F442B4DFD910071DE58 /* DOBootstrapper.h */,
 				8C029F452B4DFD910071DE58 /* DOBootstrapper.m */,
+                A25990010000000000000002 /* DORuntimeConfiguration.m */,
+                A25990010000000000000003 /* DORuntimeConfiguration.h */,
 				8614E355301AB63E00B1B88C /* DOBootstrapper+zstd.h */,
 				8614E356301AB63E00B1B88C /* DOBootstrapper+zstd.m */,
 				8C029F612B4E2E140071DE58 /* DOJailbreaker.h */,
@@ -2304,6 +2309,7 @@
 				042479B92B66916B0082581B /* DOGlobalAppearance.m in Sources */,
 				8C9E46292ACA1CC700B5456A /* UIImage+Blur.m in Sources */,
 				8C029F462B4DFD910071DE58 /* DOBootstrapper.m in Sources */,
+                A25990010000000000000001 /* DORuntimeConfiguration.m in Sources */,
 				042479AD2B66916B0082581B /* DOHeaderView.m in Sources */,
 				042479AB2B66916B0082581B /* DOModalTransitionScale.m in Sources */,
 				2F11A325301BFE9200C1C9F0 /* momentarius.c in Sources */,
