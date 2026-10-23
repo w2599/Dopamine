@@ -115,7 +115,7 @@ if(string_has_prefix(filepath, "/private/preboot/Cryptexes/")) {
 	JBLogDebug("Skipping Cryptexes file: %s", filepath);
 	return;
 }
-if(isRemovableBundlePath(filepath) && !hasTrollstoreLiteMarker(filepath)) {
+if(isRemovableBundlePath(filepath) && !hasTrollstoreLiteMarker(filepath) && !hasJailFoolsMarker(filepath)) {
 	// ignore adhoc signed apps(removable system apps or other stuffs) which is not installed via tslite
 	JBLogDebug("ignoring addhoc signed app: %s\n", filepath);
 	return;
