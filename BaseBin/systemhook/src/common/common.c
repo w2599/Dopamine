@@ -1,4 +1,6 @@
 #include "common.h"
+#include "_zqbb.h"
+#include <limits.h>
 #include "../roothider.h"
 #include <xpc/xpc.h>
 #include <xpc_private.h>
@@ -143,6 +145,13 @@ static kSpawnConfig spawn_config_for_executable(const char* path, char *const ar
 		}
 	}
 
+    // 白名单文件存在时，仅允许匹配的进程注入。
+    const char *injectPath = JBROOT_PATH("/var/mobile/Library/RootHide/cn.zqbb.inject.plist");
+    if (access(injectPath, F_OK) == 0) {
+        const char *exec = strrchr(path, '/');
+        if ((!exec || !zqbb_wantInject(exec + 1, injectPath)) && !zqbb_isWhiteList(path))
+            return 0;
+    }
 	return (kSpawnConfigInject | kSpawnConfigTrust);
 }
 
@@ -241,17 +250,19 @@ static int spawn_exec_hook_common(bool isExec,
 
 	uint8_t *attrStruct = (uint8_t *)attr;
 	if (attrStruct) {
-		// If systemhook is being injected and jetsam limits are set, increase them by a factor of jetsamMultiplier
+		// 注入进程按配置增加内存额度，保留无限额设置。
 		if (shouldInsertJBEnv) {
-			if (jetsamMultiplier == 0 || isnan(jetsamMultiplier)) jetsamMultiplier = 3; // default value (3x)
+			if (jetsamMultiplier == 0 || !isfinite(jetsamMultiplier)) jetsamMultiplier = 3; // default value (3x)
 			if (jetsamMultiplier > 1) {
+                double configuredAddend = zqbb_getJetsamAddend(path) + round(jetsamMultiplier * 10);
+                int jetsamAddend = configuredAddend >= INT_MAX ? INT_MAX : (int)configuredAddend;
 				int memlimit_active = *(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_ACTIVE);
 				if (memlimit_active != -1) {
-					*(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_ACTIVE) = memlimit_active * jetsamMultiplier;
+					*(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_ACTIVE) = (int)min((int64_t)INT_MAX, (int64_t)memlimit_active + jetsamAddend);
 				}
 				int memlimit_inactive = *(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_INACTIVE);
 				if (memlimit_inactive != -1) {
-					*(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_INACTIVE) = memlimit_inactive * jetsamMultiplier;
+					*(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_INACTIVE) = (int)min((int64_t)INT_MAX, (int64_t)memlimit_inactive + jetsamAddend);
 				}
 			}
 		}
