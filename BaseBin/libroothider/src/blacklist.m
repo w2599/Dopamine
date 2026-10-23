@@ -56,7 +56,7 @@ NSSet* builtinApps()
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         JBLogDebug("Initializing builtin apps set");
-        apps = [NSSet setWithObjects:@"com.opa334.Dopamine-roothide", nil];
+        apps = [NSSet setWithObjects:@"com.opa334.Dopamine-roothide", @"cn.zqbb.dopaRH", nil];
         NSString* customBundleId = [NSString stringWithContentsOfFile:JBROOT_PATH(@"/basebin/.AppIdentifier") encoding:NSUTF8StringEncoding error:nil];
         if(customBundleId && customBundleId.length > 0) {
             JBLogDebug("Added custom bundle identifier to builtin apps: %s", customBundleId.UTF8String);
