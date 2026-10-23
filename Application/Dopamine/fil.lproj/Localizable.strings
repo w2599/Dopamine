@@ -123,3 +123,32 @@
 "Select_Package_Managers_Install_Message" = "Kung hindi ka sigurado kung alin ang pipiliin, piliin ang Sileo";
 "Continue" = "Magpatuloy";
 
+
+"Injection_Mode_Waiting" = "Waiting for jailbreak";
+
+"Injection_Mode_Whitelist" = "Whitelist";
+
+"Injection_Mode_Blacklist" = "Blacklist";
+
+"Sileo_Open_Failed" = "Could not open Sileo. Install Sileo and refresh its package sources first.";
+
+"Jetsam_Disabled" = "Disabled";
+
+"Settings_Jetsam_Multiplier" = "Jetsam Additional Memory";
+
+"Jetsam_Description" = "Adds the selected MB amount to each injected process’s configured allowance (10 MB by default; SpringBoard 1024 MB, xxtouch 48 MB, thermalmonitord 16 MB). Disabled leaves limits unchanged. Unlimited limits remain unlimited. Process allowances are stored in cn.zqbb.jetsam.addend.plist.";
+
+"Install Whitelist App" = "Install Whitelist App";
+
+"Install Mount App" = "Install Mount App";
+
+"If you encounter any issues, please reproduce them using the official version before reporting." = "Kung makaranas ka ng anumang problema, subukang ulitin ito gamit ang opisyal na bersyon bago ito iulat.";
+
+// 主页系统信息
+"System version: %@" = "Bersyon ng system: %@";
+"System boot time: %@" = "Tagal ng pagtakbo ng system: %@";
+"Unknown" = "Hindi alam";
+
+"Uptime_Format" = "%llu araw %02llu:%02llu:%02llu";
+"Build version: %@" = "Bersyon ng build: %@";
+"Build time: %@" = "Oras ng build: %@";

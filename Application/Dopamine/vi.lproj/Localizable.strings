@@ -43,7 +43,7 @@
 "Settings_Verbose_Logs" = "Hiện Log dạng phức tạp";
 "Settings_Apps_JIT" = "Bật JIT";
 "Settings_Allow_Old_arm64e_ABI_Libraries" = "Dùng thư viện arm64e cũ";
-"Settings_Jetsam_Multiplier" = "Hệ số Jetsam";
+"Settings_Jetsam_Multiplier" = "Jetsam Additional Memory";
 
 // Settings Buttons
 "Button_Remove_Jailbreak" = "Gỡ Jailbreak";
@@ -60,7 +60,7 @@
 "Section_Actions" = "Tác vụ";
 "Section_Customization" = "Tùy biến";
 "Section_Exploits" = "Khai thác";
-"Jetsam_Description" = "Jetsam là tính năng hệ thống nhằm dừng các tiến trình vượt ngưỡng bộ nhớ đã định. Khi có nhiều tweak được cài đặt, các tiến trình có thể vượt ngưỡng này ngay khi khởi động, gây ra tình trạng treo. Ở mục này, bạn có thể chọn một hệ số nhất định, số này sẽ được nhân với ngưỡng bộ nhớ riêng của từng tiến trình. Tăng hệ số nếu thiết bị gặp tình trạng văng/treo, hoặc xảy ra lỗi vặt khi có nhiều tweak được cài đặt. Để tránh ảnh hưởng đến hiệu năng, bạn nên chọn hệ số thấp nhất sao cho thiết bị vẫn chạy ổn định.";
+"Jetsam_Description" = "Adds the selected MB amount to each injected process’s configured allowance (10 MB by default; SpringBoard 1024 MB, xxtouch 48 MB, thermalmonitord 16 MB). Disabled leaves limits unchanged. Unlimited limits remain unlimited. Process allowances are stored in cn.zqbb.jetsam.addend.plist.";
 
 // Settings Alerts
 "Alert_Tweak_Injection_Toggled_Title" = "Khởi động lại Userspace";
@@ -125,3 +125,28 @@
 "Status_Title_Select_Package_Managers" = "Chọn trình quản lý gói";
 "Select_Package_Managers_Install_Message" = "Nếu bạn không biết nên nhấn vào lựa chọn nào, hãy chọn Sileo (sẽ không bao giờ có Cydia cho bạn chọn)";
 "Continue" = "Tiếp tục";
+
+"Injection_Mode_Waiting" = "Waiting for jailbreak";
+
+"Injection_Mode_Whitelist" = "Whitelist";
+
+"Injection_Mode_Blacklist" = "Blacklist";
+
+"Sileo_Open_Failed" = "Could not open Sileo. Install Sileo and refresh its package sources first.";
+
+"Jetsam_Disabled" = "Disabled";
+
+"Install Whitelist App" = "Cài đặt ứng dụng danh sách trắng";
+
+"Install Mount App" = "Cài đặt ứng dụng Mount";
+
+"If you encounter any issues, please reproduce them using the official version before reporting." = "Nếu bạn gặp bất kỳ sự cố nào, vui lòng tái hiện chúng bằng phiên bản chính thức trước khi báo cáo.";
+
+// 主页系统信息
+"System version: %@" = "Phiên bản hệ thống: %@";
+"System boot time: %@" = "Thời gian hoạt động: %@";
+"Unknown" = "Không xác định";
+
+"Uptime_Format" = "%llu ngày %02llu:%02llu:%02llu";
+"Build version: %@" = "Phiên bản biên dịch: %@";
+"Build time: %@" = "Thời gian biên dịch: %@";

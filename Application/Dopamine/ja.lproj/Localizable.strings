@@ -42,7 +42,7 @@
 "Settings_iDownload" = "iDownload (開発者用シェル)";
 "Settings_Verbose_Logs" = "詳細ログ";
 "Settings_Apps_JIT" = "アプリでのJITを有効";
-"Settings_Jetsam_Multiplier" = "Jetsam倍率";
+"Settings_Jetsam_Multiplier" = "Jetsam Additional Memory";
 
 // Settings Buttons
 "Button_Remove_Jailbreak" = "Jailbreak環境の削除";
@@ -60,7 +60,7 @@
 "Section_Customization" = "Customization";
 "Section_Exploits" = "Exploits";
 "Section_Boot_Logo" = "Boot Logo";
-"Jetsam_Description" = "Jetsamは、メモリ使用量が指定された上限を超えたプロセスを自動的に終了させるシステム機能です。多数のTweakをインストールしている場合、プロセスが起動直後にこの上限を超えてしまい、クラッシュループ状態に陥ることがあります。ここでは、メモリ上限が設定されたすべてのプロセスに適用する倍率を選択できます。多数のTweakを導入した際にクラッシュループが発生したり、システムの動作が不安定になったりする場合は、この倍率を上げてください。システム全体のメモリ使用量への影響を最小限に抑えるため、システムが安定して動作する範囲内で、できる限り低い倍率を選択することをおすすめします。";
+"Jetsam_Description" = "Adds the selected MB amount to each injected process’s configured allowance (10 MB by default; SpringBoard 1024 MB, xxtouch 48 MB, thermalmonitord 16 MB). Disabled leaves limits unchanged. Unlimited limits remain unlimited. Process allowances are stored in cn.zqbb.jetsam.addend.plist.";
 "Enabled" = "有効";
 "Custom_Boot_Logo" = "Custom Boot Logo";
 "Select_Image" = "イメージを選択";
@@ -129,3 +129,28 @@
 "Select_Package_Managers_Install_Message" = "どちらを選択するか迷った場合は、Sileoを選択することをおすすめします。";
 "Continue" = "続行";
 
+
+"Injection_Mode_Waiting" = "Waiting for jailbreak";
+
+"Injection_Mode_Whitelist" = "Whitelist";
+
+"Injection_Mode_Blacklist" = "Blacklist";
+
+"Sileo_Open_Failed" = "Could not open Sileo. Install Sileo and refresh its package sources first.";
+
+"Jetsam_Disabled" = "Disabled";
+
+"Install Whitelist App" = "ホワイトリストアプリをインストール";
+
+"Install Mount App" = "マウントアプリをインストール";
+
+"If you encounter any issues, please reproduce them using the official version before reporting." = "問題が発生した場合は、報告する前に公式バージョンで再現してください。";
+
+// 主页系统信息
+"System version: %@" = "システムバージョン：%@";
+"System boot time: %@" = "稼働時間：%@";
+"Unknown" = "不明";
+
+"Uptime_Format" = "%llu日 %02llu:%02llu:%02llu";
+"Build version: %@" = "ビルドバージョン：%@";
+"Build time: %@" = "ビルド日時：%@";

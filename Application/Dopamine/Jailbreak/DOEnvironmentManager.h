@@ -55,6 +55,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)rebootUserspace;
 - (void)rebuildIconCache;
 - (void)refreshJailbreakApps;
+- (NSString *)injectionModeDescription;
+- (NSString *)sileoURLScheme;
 - (void)reboot;
 - (void)changeMobilePassword:(NSString *)newPassword;
 - (NSError*)updateEnvironment;

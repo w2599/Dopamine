@@ -924,4 +924,46 @@ extern char **environ;
     }
 }
 
+// 根据注入配置是否存在返回模式简称，供系统版本后的括号显示。
+- (NSString *)injectionModeDescription
+{
+    if (!self.isJailbroken) return DOLocalizedString(@"Injection_Mode_Waiting");
+    BOOL whitelist = access(JBROOT_PATH("/var/mobile/Library/RootHide/cn.zqbb.inject.plist"), F_OK) == 0;
+    return DOLocalizedString(whitelist ? @"Injection_Mode_Whitelist" : @"Injection_Mode_Blacklist");
+}
+
+// 读取当前 Sileo 的 URL scheme，兼容 RootHide 重写。
+- (NSString *)sileoURLScheme {
+    if (!self.isJailbroken) {
+        return @"sileo";
+    }
+
+    NSString *path = JBROOT_PATH(@"/Applications/Sileo.app/Info.plist");
+    NSDictionary *info = path ? [NSDictionary dictionaryWithContentsOfFile:path] : nil;
+    id urlTypes = info[@"CFBundleURLTypes"];
+    if (![urlTypes isKindOfClass:NSArray.class]) {
+        return @"sileo";
+    }
+
+    for (id urlType in urlTypes) {
+        if (![urlType isKindOfClass:NSDictionary.class]) {
+            continue;
+        }
+        id schemes = urlType[@"CFBundleURLSchemes"];
+        if (![schemes isKindOfClass:NSArray.class]) {
+            continue;
+        }
+        for (id scheme in schemes) {
+            if (![scheme isKindOfClass:NSString.class] || [scheme length] == 0) {
+                continue;
+            }
+            NSURL *url = [NSURL URLWithString:[scheme stringByAppendingString:@"://package"]];
+            if ([url.scheme isEqualToString:scheme] && [url.host isEqualToString:@"package"]) {
+                return scheme;
+            }
+        }
+    }
+    return @"sileo";
+}
+
 @end
