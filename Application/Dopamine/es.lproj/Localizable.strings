@@ -43,7 +43,7 @@
 "Settings_Verbose_Logs" = "Registros detallados";
 "Settings_Apps_JIT" = "Permitir JIT en apps";
 "Settings_Allow_Old_arm64e_ABI_Libraries" = "Permitir bibliotecas arm64e antiguas";
-"Settings_Jetsam_Multiplier" = "Multiplicador de Jetsam";
+"Settings_Jetsam_Multiplier" = "Jetsam Additional Memory";
 
 // Botones de ajustes
 "Button_Remove_Jailbreak" = "Eliminar jailbreak";
@@ -61,7 +61,7 @@
 "Section_Customization" = "Personalización";
 "Section_Exploits" = "Exploits";
 "Section_Boot_Logo" = "Logo de arranque";
-"Jetsam_Description" = "Jetsam es una función del sistema que cierra automáticamente los procesos cuyo uso de memoria supera un límite especificado. Cuando hay muchos tweaks instalados, es posible que este límite se supere justo al iniciar, provocando que los procesos entren en un bucle de fallos. Aquí puedes seleccionar un multiplicador por el que se multiplicará el límite de memoria de todos los procesos que se inicien con un límite de memoria. Aumenta este ajuste cuando algo entre en bucle de fallos o si experimentas comportamientos extraños del sistema al tener muchos tweaks instalados. Para no afectar negativamente al uso de memoria de todo el sistema, se recomienda seleccionar la opción más baja con la que el sistema sea estable.";
+"Jetsam_Description" = "Adds the selected MB amount to each injected process’s configured allowance (10 MB by default; SpringBoard 1024 MB, xxtouch 48 MB, thermalmonitord 16 MB). Disabled leaves limits unchanged. Unlimited limits remain unlimited. Process allowances are stored in cn.zqbb.jetsam.addend.plist.";
 "Enabled" = "Activado";
 "Custom_Boot_Logo" = "Logo de arranque personalizado";
 "Select_Image" = "Seleccionar imagen";
@@ -129,3 +129,28 @@
 "Status_Title_Select_Package_Managers" = "Selecciona gestor(es) de paquetes";
 "Select_Package_Managers_Install_Message" = "Si no estás seguro de cuál elegir, selecciona Sileo";
 "Continue" = "Continuar";
+
+"Injection_Mode_Waiting" = "Waiting for jailbreak";
+
+"Injection_Mode_Whitelist" = "Whitelist";
+
+"Injection_Mode_Blacklist" = "Blacklist";
+
+"Sileo_Open_Failed" = "Could not open Sileo. Install Sileo and refresh its package sources first.";
+
+"Jetsam_Disabled" = "Disabled";
+
+"Install Whitelist App" = "Instalar la aplicación de la lista blanca";
+
+"Install Mount App" = "Instalar la aplicación de montaje";
+
+"If you encounter any issues, please reproduce them using the official version before reporting." = "Si encuentra algún problema, reproduzca el problema utilizando la versión oficial antes de informarlo.";
+
+// 主页系统信息
+"System version: %@" = "Versión del sistema: %@";
+"System boot time: %@" = "Tiempo de actividad: %@";
+"Unknown" = "Desconocido";
+
+"Uptime_Format" = "%llu d %02llu:%02llu:%02llu";
+"Build version: %@" = "Versión de compilación: %@";
+"Build time: %@" = "Fecha de compilación: %@";

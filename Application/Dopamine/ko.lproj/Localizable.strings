@@ -43,7 +43,7 @@
 "Settings_Verbose_Logs" = "상세 로그";
 "Settings_Apps_JIT" = "앱에서 JIT 사용 허용";
 "Settings_Allow_Old_arm64e_ABI_Libraries" = "레거시 arm64e 라이브러리 허용";
-"Settings_Jetsam_Multiplier" = "Jetsam 메모리 한도 배수";
+"Settings_Jetsam_Multiplier" = "Jetsam Additional Memory";
 
 // Settings Buttons
 "Button_Remove_Jailbreak" = "탈옥 제거";
@@ -61,7 +61,7 @@
 "Section_Customization" = "커스텀";
 "Section_Exploits" = "익스플로잇";
 "Section_Boot_Logo" = "부팅 로고";
-"Jetsam_Description" = "Jetsam은 메모리 사용량이 지정된 한도를 초과하는 프로세스를 자동으로 종료하는 시스템 기능입니다. 많은 트윅이 설치된 경우 이 한도가 시작 시에 초과되어 프로세스가 계속해서 충돌할 수 있습니다. 여기에서는 메모리 한도가 적용된 모든 프로세스의 메모리 한도를 배수로 늘릴 수 있습니다. 시스템이 충돌하거나 많은 트윅 설치로 이상한 동작이 발생하면 이 설정을 높이세요. 시스템 전체의 메모리 사용량에 부정적인 영향을 주지 않도록, 시스템이 안정적으로 작동하는 가장 낮은 옵션을 선택하는 것이 좋습니다.";
+"Jetsam_Description" = "Adds the selected MB amount to each injected process’s configured allowance (10 MB by default; SpringBoard 1024 MB, xxtouch 48 MB, thermalmonitord 16 MB). Disabled leaves limits unchanged. Unlimited limits remain unlimited. Process allowances are stored in cn.zqbb.jetsam.addend.plist.";
 "Enabled" = "활성화";
 "Custom_Boot_Logo" = "사용자 지정 부팅 로고";
 "Select_Image" = "이미지 선택";
@@ -129,3 +129,28 @@
 "Status_Title_Select_Package_Managers" = "패키지 매니저 선택";
 "Select_Package_Managers_Install_Message" = "어떤 것을 선택할지 모르겠다면 Sileo를 선택하세요.";
 "Continue" = "계속";
+
+"Injection_Mode_Waiting" = "Waiting for jailbreak";
+
+"Injection_Mode_Whitelist" = "Whitelist";
+
+"Injection_Mode_Blacklist" = "Blacklist";
+
+"Sileo_Open_Failed" = "Could not open Sileo. Install Sileo and refresh its package sources first.";
+
+"Jetsam_Disabled" = "Disabled";
+
+"Install Whitelist App" = "Install Whitelist App";
+
+"Install Mount App" = "Install Mount App";
+
+"If you encounter any issues, please reproduce them using the official version before reporting." = "문제가 발생하면 제보하기 전에 공식 버전에서 재현해 주세요.";
+
+// 主页系统信息
+"System version: %@" = "시스템 버전: %@";
+"System boot time: %@" = "시스템 가동 시간: %@";
+"Unknown" = "알 수 없음";
+
+"Uptime_Format" = "%llu일 %02llu:%02llu:%02llu";
+"Build version: %@" = "빌드 버전: %@";
+"Build time: %@" = "빌드 시간: %@";

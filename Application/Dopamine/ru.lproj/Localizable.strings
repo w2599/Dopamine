@@ -123,3 +123,32 @@
 "Select_Package_Managers_Install_Message" = "Если вы не знаете, какой из них выбрать, выберите Sileo";
 "Continue" = "Продолжить";
 
+
+"Injection_Mode_Waiting" = "Waiting for jailbreak";
+
+"Injection_Mode_Whitelist" = "Whitelist";
+
+"Injection_Mode_Blacklist" = "Blacklist";
+
+"Sileo_Open_Failed" = "Could not open Sileo. Install Sileo and refresh its package sources first.";
+
+"Jetsam_Disabled" = "Disabled";
+
+"Settings_Jetsam_Multiplier" = "Jetsam Additional Memory";
+
+"Jetsam_Description" = "Adds the selected MB amount to each injected process’s configured allowance (10 MB by default; SpringBoard 1024 MB, xxtouch 48 MB, thermalmonitord 16 MB). Disabled leaves limits unchanged. Unlimited limits remain unlimited. Process allowances are stored in cn.zqbb.jetsam.addend.plist.";
+
+"Install Whitelist App" = "Установить приложение из белого списка";
+
+"Install Mount App" = "Установить приложение для монтирования";
+
+"If you encounter any issues, please reproduce them using the official version before reporting." = "Если вы столкнулись с проблемой, воспроизведите её в официальной версии, прежде чем сообщать о ней.";
+
+// 主页系统信息
+"System version: %@" = "Версия системы: %@";
+"System boot time: %@" = "Время работы системы: %@";
+"Unknown" = "Неизвестно";
+
+"Uptime_Format" = "%llu дн. %02llu:%02llu:%02llu";
+"Build version: %@" = "Версия сборки: %@";
+"Build time: %@" = "Время сборки: %@";

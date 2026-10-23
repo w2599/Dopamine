@@ -43,7 +43,7 @@
 "Settings_Verbose_Logs" = "詳細日誌";
 "Settings_Apps_JIT" = "允許應用程式使用 JIT";
 "Settings_Allow_Old_arm64e_ABI_Libraries" = "允許舊版 arm64e 函式庫";
-"Settings_Jetsam_Multiplier" = "Jetsam 倍率";
+"Settings_Jetsam_Multiplier" = "Jetsam Additional Memory";
 
 // Settings Buttons
 "Button_Remove_Jailbreak" = "移除越獄";
@@ -61,7 +61,7 @@
 "Section_Customization" = "自訂";
 "Section_Exploits" = "漏洞利用";
 "Section_Boot_Logo" = "開機 Logo";
-"Jetsam_Description" = "Jetsam 是一項系統功能，會自動終止記憶體用量超過指定限制的程序。安裝大量 Tweak 時，程序可能會在啟動時就超過此限制，導致反覆崩潰。在此可選擇倍率，所有設有記憶體限制的程序，其限制都會乘上這個倍率。當程序反覆崩潰，或安裝大量 Tweak 後出現異常的系統行為時，可提高此設定。為避免對整體系統的記憶體使用造成負面影響，建議選擇能讓系統穩定運作的最低倍率。";
+"Jetsam_Description" = "Adds the selected MB amount to each injected process’s configured allowance (10 MB by default; SpringBoard 1024 MB, xxtouch 48 MB, thermalmonitord 16 MB). Disabled leaves limits unchanged. Unlimited limits remain unlimited. Process allowances are stored in cn.zqbb.jetsam.addend.plist.";
 "Enabled" = "啟用";
 "Custom_Boot_Logo" = "自訂開機 Logo";
 "Select_Image" = "選擇圖片";
@@ -129,3 +129,28 @@
 "Status_Title_Select_Package_Managers" = "選擇套件管理器";
 "Select_Package_Managers_Install_Message" = "如果不確定該選哪一個，請選擇 Sileo";
 "Continue" = "繼續";
+
+"Injection_Mode_Waiting" = "等待越獄";
+
+"Injection_Mode_Whitelist" = "白名單";
+
+"Injection_Mode_Blacklist" = "黑名單";
+
+"Sileo_Open_Failed" = "Could not open Sileo. Install Sileo and refresh its package sources first.";
+
+"Jetsam_Disabled" = "Disabled";
+
+"Install Whitelist App" = "Install Whitelist App";
+
+"Install Mount App" = "Install Mount App";
+
+"If you encounter any issues, please reproduce them using the official version before reporting." = "如有問題，請使用官方版本重現後再回報。";
+
+// 首頁系統資訊
+"System version: %@" = "系統版本：%@";
+"System boot time: %@" = "運作時間：%@";
+"Unknown" = "未知";
+
+"Uptime_Format" = "%llu天 %02llu:%02llu:%02llu";
+"Build version: %@" = "編譯版本：%@";
+"Build time: %@" = "編譯時間：%@";

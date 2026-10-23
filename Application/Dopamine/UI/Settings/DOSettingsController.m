@@ -139,13 +139,13 @@
 - (NSArray *)jetsamOptionTitles
 {
     return @[
-        @"1x",
-        @"1.5x",
-        @"2x",
-        @"2.5x",
-        [NSString stringWithFormat:@"3x (%@)", DOLocalizedString(@"Recommended")],
-        @"3.5x",
-        @"4x",
+        DOLocalizedString(@"Jetsam_Disabled"),
+        @"+15 MB",
+        @"+20 MB",
+        @"+25 MB",
+        [NSString stringWithFormat:@"+30 MB (%@)", DOLocalizedString(@"Recommended")],
+        @"+35 MB",
+        @"+40 MB",
     ];
 }
 
@@ -298,6 +298,18 @@
                 [specifiers addObject:actionsGroupSpecifier];
 
                 if (envManager.isJailbroken) {
+                    for (NSDictionary *tool in @[
+                        @{@"title": @"Install Whitelist App", @"action": @"installWhitelistAppPressed"},
+                        @{@"title": @"Install Mount App", @"action": @"installMountAppPressed"}
+                    ]) {
+                        PSSpecifier *toolSpecifier = [PSSpecifier preferenceSpecifierNamed:@"" target:self set:defSetter get:defGetter detail:nil cell:PSStaticTextCell edit:nil];
+                        [toolSpecifier setProperty:tool[@"title"] forKey:@"title"];
+                        [toolSpecifier setProperty:DOButtonCell.class forKey:@"cellClass"];
+                        [toolSpecifier setProperty:buttonHeight forKey:@"height"];
+                        [toolSpecifier setProperty:@"square.and.arrow.down" forKey:@"image"];
+                        [toolSpecifier setProperty:tool[@"action"] forKey:@"action"];
+                        [specifiers addObject:toolSpecifier];
+                    }
                     PSSpecifier *refreshAppsSpecifier = [PSSpecifier preferenceSpecifierNamed:@"" target:self set:defSetter get:defGetter detail:nil cell:PSStaticTextCell edit:nil];
                     [refreshAppsSpecifier setProperty:@"Button_Refresh_Jailbreak_Apps" forKey:@"title"];
                     [refreshAppsSpecifier setProperty:[DOButtonCell class] forKey:@"cellClass"];
@@ -693,6 +705,32 @@
 }
 
 #pragma mark - Button Actions
+
+// 打开当前 Sileo 的配套工具详情页。
+- (void)openSileoPackage:(NSString *)identifier
+{
+    DOEnvironmentManager *environment = DOEnvironmentManager.sharedManager;
+    if (!environment.isJailbroken) return;
+    NSURL *url = [NSURL URLWithString:[NSString stringWithFormat:@"%@://package/%@", environment.sileoURLScheme, identifier]];
+    [UIApplication.sharedApplication openURL:url options:@{} completionHandler:^(BOOL success) {
+        if (success) return;
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:DOLocalizedString(@"Error") message:DOLocalizedString(@"Sileo_Open_Failed") preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:DOLocalizedString(@"OK") style:UIAlertActionStyleDefault handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil];
+    }];
+}
+
+// 跳转安装白名单管理器。
+- (void)installWhitelistAppPressed
+{
+    [self openSileoPackage:@"cn.zqbb.inject.manager"];
+}
+
+// 跳转安装挂载管理器。
+- (void)installMountAppPressed
+{
+    [self openSileoPackage:@"cn.zqbb.hello.mnt"];
+}
 
 - (void)refreshJailbreakAppsPressed
 {

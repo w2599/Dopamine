@@ -31,6 +31,7 @@ endif
 	cp ../BaseBin/.build/libroothider.dylib build/Build/Products/Debug-iphoneos/Dopamine.app/
 	plutil -replace CFBundleIdentifier -string "cn.zqbb.dopaRH" build/Build/Products/Debug-iphoneos/Dopamine.app/Info.plist
 	plutil -replace CFBundleShortVersionString -string "$(APP_VERSION)" build/Build/Products/Debug-iphoneos/Dopamine.app/Info.plist
+	plutil -replace DOBuildTimestamp -integer "$(BUILD_TIMESTAMP)" build/Build/Products/Debug-iphoneos/Dopamine.app/Info.plist
 # ifeq ($(PALEHIDE), 1)
 	make -C Dopamine/Exploits/palera1n package
 	cp -a Dopamine/Exploits/palera1n/.framework build/Build/Products/Debug-iphoneos/Dopamine.app/Frameworks/palera1n.framework

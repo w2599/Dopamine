@@ -123,3 +123,32 @@
 "Select_Package_Managers_Install_Message" = "若不確定如何選擇，請使用 Sileo";
 "Continue" = "繼續";
 
+
+"Injection_Mode_Waiting" = "等待越獄";
+
+"Injection_Mode_Whitelist" = "白名單";
+
+"Injection_Mode_Blacklist" = "黑名單";
+
+"Sileo_Open_Failed" = "Could not open Sileo. Install Sileo and refresh its package sources first.";
+
+"Jetsam_Disabled" = "Disabled";
+
+"Settings_Jetsam_Multiplier" = "Jetsam Additional Memory";
+
+"Jetsam_Description" = "Adds the selected MB amount to each injected process’s configured allowance (10 MB by default; SpringBoard 1024 MB, xxtouch 48 MB, thermalmonitord 16 MB). Disabled leaves limits unchanged. Unlimited limits remain unlimited. Process allowances are stored in cn.zqbb.jetsam.addend.plist.";
+
+"Install Whitelist App" = "Install Whitelist App";
+
+"Install Mount App" = "Install Mount App";
+
+"If you encounter any issues, please reproduce them using the official version before reporting." = "如有問題，請使用官方版本重現後再報告。";
+
+// 主頁系統資訊
+"System version: %@" = "系統版本：%@";
+"System boot time: %@" = "運作時間：%@";
+"Unknown" = "未知";
+
+"Uptime_Format" = "%llu天 %02llu:%02llu:%02llu";
+"Build version: %@" = "編譯版本：%@";
+"Build time: %@" = "編譯時間：%@";
