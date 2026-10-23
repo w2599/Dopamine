@@ -2,6 +2,9 @@ export NIGHTLY ?= 0
 
 export BUILD_STANDALONE ?= 0
 
+# Theos 模块缓存与生成的头文件同生命周期，避免重建后复用失效模块。
+export ADDITIONAL_CFLAGS := $(ADDITIONAL_CFLAGS) -fmodules-cache-path="$(CURDIR)/BaseBin/.include/.module-cache"
+
 ifeq ($(NIGHTLY), 1)
 export COMMIT_HASH = $(shell git rev-parse HEAD)
 endif

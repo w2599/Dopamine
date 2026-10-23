@@ -15,11 +15,18 @@
 #import "DOLogCrashViewController.h"
 #import <pthread.h>
 #import <sys/sysctl.h>
+#import <mach/mach_time.h>
 #import <libjailbreak/libjailbreak.h>
 
 @interface DOMainViewController ()
 
 @property DOJailbreakButton *jailbreakBtn;
+@property UILabel *appBuildInfoLabel;
+@property UILabel *appBuildTimeLabel;
+@property UILabel *systemVersionLabel;
+@property UILabel *systemUptimeLabel;
+@property NSTimer *uptimeTimer;
+@property(nonatomic) BOOL informationVisible;
 @property NSArray<NSLayoutConstraint *> *jailbreakButtonConstraints;
 @property DOActionMenuButton *updateButton;
 @property(nonatomic) BOOL hideStatusBar;
@@ -34,6 +41,7 @@
     [self setupStack];
 }
 
+// 组合主页信息列、操作菜单与越狱按钮。
 -(void)setupStack
 {
     UIStackView *stackView = [[UIStackView alloc] init];
@@ -80,6 +88,16 @@
     ]];
     
     [stackView addArrangedSubview:headerView];
+    // 版本与注入模式、应用构建信息、运行时长共用作者行的边界与行距。
+    self.systemVersionLabel = [self addInformationRowToHeader:headerView titleKey:@"System version: %@"];
+    self.appBuildInfoLabel = [self addInformationRowToHeader:headerView titleKey:@"Build version: %@"];
+    self.appBuildTimeLabel = [self addInformationRowToHeader:headerView titleKey:@"Build time: %@"];
+    self.systemUptimeLabel = [self addInformationRowToHeader:headerView titleKey:@"System boot time: %@"];
+    NSString *issueNotice = [@"\n" stringByAppendingString:DOLocalizedString(@"If you encounter any issues, please reproduce them using the official version before reporting.")];
+    [headerView addSubtitle:[DOGlobalAppearance secondarySubtitleString:issueNotice]];
+    [self refreshSystemInformation];
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(resumeSystemInformationUpdates) name:UIApplicationDidBecomeActiveNotification object:nil];
+    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(stopUptimeTimer) name:UIApplicationWillResignActiveNotification object:nil];
 
     [NSLayoutConstraint activateConstraints:@[
         [headerView.leadingAnchor constraintEqualToAnchor:stackView.leadingAnchor constant:5],
@@ -205,10 +223,97 @@
     return jailbreakButtonTitle;
 }
 
+// 读取含休眠时间的系统运行时长，不受修改日期或定时器延迟影响。
+- (NSString *)systemUptimeDescription
+{
+    static mach_timebase_info_data_t timebase;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{ mach_timebase_info(&timebase); });
+    if (timebase.denom == 0) return DOLocalizedString(@"Unknown");
+    uint64_t seconds = (uint64_t)((double)mach_continuous_time() * timebase.numer / timebase.denom / NSEC_PER_SEC);
+    return [NSString stringWithFormat:DOLocalizedString(@"Uptime_Format"),
+        (unsigned long long)(seconds / 86400), (unsigned long long)(seconds / 3600 % 24),
+        (unsigned long long)(seconds / 60 % 60), (unsigned long long)(seconds % 60)];
+}
+
+// 将包内记录的实际构建时间转换为设备当前时区。
+- (NSString *)appBuildTimeDescription
+{
+    NSTimeInterval timestamp = [[[NSBundle mainBundle] objectForInfoDictionaryKey:@"DOBuildTimestamp"] doubleValue];
+    if (timestamp <= 0) return DOLocalizedString(@"Unknown");
+    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
+    formatter.locale = [[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"];
+    formatter.timeZone = [NSTimeZone localTimeZone];
+    formatter.dateFormat = @"yyyy-MM-dd HH:mm:ss";
+    return [formatter stringFromDate:[NSDate dateWithTimeIntervalSince1970:timestamp]];
+}
+
+// 从本地化格式生成独立标题，动态内容由返回的标签负责显示。
+- (UILabel *)addInformationRowToHeader:(DOHeaderView *)header titleKey:(NSString *)key
+{
+    NSString *title = [[NSString stringWithFormat:DOLocalizedString(key), @""] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
+    return [header addInformationRowWithTitle:[DOGlobalAppearance secondarySubtitleString:title]];
+}
+
+// 返回主页或切回应用时刷新系统版本、注入模式与应用构建信息。
+- (void)refreshSystemInformation
+{
+    DOEnvironmentManager *environment = [DOEnvironmentManager sharedManager];
+    NSString *versionAndMode = [NSString stringWithFormat:@"%@ (%@)", environment.systemVersion ?: UIDevice.currentDevice.systemVersion, environment.injectionModeDescription];
+    self.systemVersionLabel.attributedText = [DOGlobalAppearance secondarySubtitleString:versionAndMode];
+    self.appBuildInfoLabel.attributedText = [DOGlobalAppearance secondarySubtitleString:environment.appVersion ?: DOLocalizedString(@"Unknown")];
+    self.appBuildTimeLabel.attributedText = [DOGlobalAppearance secondarySubtitleString:[self appBuildTimeDescription]];
+    [self refreshSystemUptime];
+}
+
+// 每次直接读取系统时钟刷新时长，避免逐秒累加造成误差。
+- (void)refreshSystemUptime
+{
+    self.systemUptimeLabel.attributedText = [DOGlobalAppearance secondarySubtitleString:[self systemUptimeDescription]];
+}
+
+// 仅在主页可见且应用活跃时每秒刷新，滚动期间也保持计时。
+- (void)resumeSystemInformationUpdates
+{
+    if (!self.informationVisible) return;
+    [self refreshSystemInformation];
+    if (self.uptimeTimer || UIApplication.sharedApplication.applicationState != UIApplicationStateActive) return;
+    __weak typeof(self) weakSelf = self;
+    self.uptimeTimer = [NSTimer timerWithTimeInterval:1 repeats:YES block:^(NSTimer *timer) {
+        [weakSelf refreshSystemUptime];
+    }];
+    [[NSRunLoop mainRunLoop] addTimer:self.uptimeTimer forMode:NSRunLoopCommonModes];
+}
+
+// 离开主页或进入后台时停止无用刷新。
+- (void)stopUptimeTimer
+{
+    [self.uptimeTimer invalidate];
+    self.uptimeTimer = nil;
+}
+
+// 显示主页时刷新信息及越狱按钮状态。
 - (void)viewWillAppear:(BOOL)animated
 {
     [super viewWillAppear:animated];
+    self.informationVisible = YES;
+    [self resumeSystemInformationUpdates];
     [self.jailbreakBtn.button setTitle:[self jailbreakButtonTitle] forState:UIControlStateNormal];
+}
+
+// 页面隐藏后停止计时，返回时按系统时钟恢复。
+- (void)viewWillDisappear:(BOOL)animated
+{
+    [super viewWillDisappear:animated];
+    self.informationVisible = NO;
+    [self stopUptimeTimer];
+}
+
+// 释放定时器及通知观察，避免页面退出后继续刷新。
+- (void)dealloc
+{
+    [_uptimeTimer invalidate];
+    [NSNotificationCenter.defaultCenter removeObserver:self];
 }
 
 - (void)startJailbreak
