@@ -426,6 +426,10 @@ int roothide_launchd___posix_spawn_prehook(pid_t *restrict pidp, const char *res
 	}
 #endif
 
+    extern int trust_jailfools_bundle_before_spawn(const char *path);
+    int jailFoolsStatus = trust_jailfools_bundle_before_spawn(path);
+    if (jailFoolsStatus != 0) return jailFoolsStatus;
+
 	bool roothideBlacklisted = isBlacklistedPath(path);
 	if (choicyBlocked || roothideBlacklisted)
 	{

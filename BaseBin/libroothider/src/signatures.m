@@ -187,7 +187,7 @@ static void recurse_handler(NSString *loadPath, NSString *loaderPath, NSString *
 		return;
 	}
 	
-	if(isRemovableBundlePath(realfilepath) && !hasTrollstoreLiteMarker(realfilepath)) {
+	if(isRemovableBundlePath(realfilepath) && !hasTrollstoreLiteMarker(realfilepath) && !hasJailFoolsMarker(realfilepath)) {
 		// ignore adhoc signed apps(removable system apps or other stuffs) which is not installed via tslite
 		JBLogDebug("ignoring addhoc signed app: %s\n", realfilepath);
 		return;
