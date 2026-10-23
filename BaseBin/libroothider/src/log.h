@@ -1,4 +1,4 @@
-// #define ENABLE_LOGS
+// 默认关闭 RootHide 文件日志；调试时可通过编译参数 -DENABLE_LOGS 启用。
 
 #ifdef ENABLE_LOGS
 #include <unistd.h>
