@@ -1,4 +1,5 @@
 #include <spawn.h>
+#include <errno.h>
 #include "../systemhook/src/common/common.h"
 #include "boomerang.h"
 #include "crashreporter.h"
@@ -77,14 +78,17 @@ if (!pid) pid = &pidval;
 	// and this would trip jailbreak detections
 	int key = crashreporter_pause();	
 	int r = __posix_spawn_inline(pid, path, desc, argv, envp);
+	// 底层失败依赖 errno，后续异常端口恢复和登记不能覆盖它。
+	int spawnError = errno;
 	crashreporter_resume(key);
 
 JBLogDebug("__posix_spawn ret=%d pid=%d", r, *pid);
 
-if(r == 0) {
+if(r == 0 && *pid > 0) {
 	register_job(*pid);
 }
 
+	errno = spawnError;
 	return r;
 }
 
