@@ -16,6 +16,7 @@
 #include <libjailbreak/txm_trust.h>
 #include "trollstore_lite_bundle.h"
 #include "trollstore_lite_txm.h"
+#include "jbserver/jbsettings.h"
 #include <xpc_private.h>
 #include <bsm/libbsm.h>
 
@@ -197,7 +198,7 @@ int roothide_launchd___posix_spawn_posthook(pid_t *restrict pidp, const char *re
 	posix_spawnattr_getprocesstype_np(attrp, &proctype);
 
 	struct trollstore_lite_txm_session *lease = NULL;
-	if (hasTrollstoreLiteMarker(path) && txm_local_signing_supported()) {
+	if (trollstore_lite_fix_enabled() && hasTrollstoreLiteMarker(path) && txm_local_signing_supported()) {
 		int status = trust_trollstore_lite_bundle_before_spawn(path);
 		if (!status) status = trollstore_lite_txm_begin(path, attrp, &lease);
 		if (status) {
@@ -521,6 +522,8 @@ int roothide_launchd___posix_spawn_prehook(pid_t *restrict pidp, const char *res
 	bool roothideBlacklisted = isBlacklistedPath(path);
 	if (choicyBlocked || roothideBlacklisted)
 	{
+		// 开关仅控制新增 TXM 修复，原有启动前自动信任始终执行。
+		bool trollstoreLiteFixEnabled = trollstore_lite_fix_enabled();
 		int trustStatus = trust_trollstore_lite_bundle_before_spawn(path);
 		if (trustStatus != 0)
 			return trustStatus;
@@ -539,7 +542,7 @@ int roothide_launchd___posix_spawn_prehook(pid_t *restrict pidp, const char *res
 		}
 		else
 		{
-            if (roothideBlacklisted && hasTrollstoreLiteMarker(path) && txm_local_signing_supported()) {
+            if (trollstoreLiteFixEnabled && roothideBlacklisted && hasTrollstoreLiteMarker(path) && txm_local_signing_supported()) {
                 return spawn_blacklisted_trollstore_lite(pidp, path, desc, argv, envp);
             }
 
