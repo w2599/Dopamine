@@ -13,6 +13,10 @@
 #include <libjailbreak/libjailbreak.h>
 #include <libjailbreak/trustcache_fs.h>
 #include <libjailbreak/jbserver.h>
+#include <libjailbreak/txm_trust.h>
+#include "trollstore_lite_bundle.h"
+#include <xpc_private.h>
+#include <bsm/libbsm.h>
 
 #include "../systemhook/src/common/common.h"
 #include "../systemhook/src/common/envbuf.h"
@@ -159,6 +163,50 @@ int roothide_launchd_trust_executable(const char* path)
 	return dyld_patch_enabled() ? systemwide_trust_file_by_path(path) : roothide_trust_executable_recurse(path, "/", NULL);
 }
 
+// 在无注入启动前信任包内代码，并缓存资源文件识别结果。
+static int trust_trollstore_lite_bundle_before_spawn(const char *path)
+{
+	if (!hasTrollstoreLiteMarker(path))
+		return 0;
+
+	NSString *bundlePath = getAppBundlePathFromSpawnPath(path);
+	if (!bundlePath)
+		return EINVAL;
+
+	int status = trollstore_lite_bundle_enumerate(bundlePath.fileSystemRepresentation, false, ^int(const char *imagePath) {
+		return jb_trustcache_add_file(imagePath);
+	});
+	if (status != 0) {
+		JBLogError("blacklisted spawn trust failed path=%s bundle=%s status=%d",
+			path, bundlePath.fileSystemRepresentation, status);
+	}
+	return status;
+}
+
+// 无注入应用不会执行 systemhook check-in，在恢复前处理其显式信任请求。
+static int patch_trollstore_lite_trust_before_resume(pid_t pid)
+{
+	uint64_t proc = proc_find(pid);
+	if (!proc) return ESRCH;
+	int status = EFAULT;
+	uint64_t procRO = kread_ptr(proc + koffsetof(proc, proc_ro));
+	if (procRO && koffsetof(proc_ro, task_tokens)) {
+		audit_token_t token = {0};
+		uint64_t address = procRO + koffsetof(proc_ro, task_tokens)
+			+ koffsetof(task_token_ro_data, audit_token);
+		if (kreadbuf(address, &token, sizeof(token)) == 0 && audit_token_to_pid(token) == pid) {
+			status = 0;
+			xpc_object_t trust = xpc_copy_entitlement_for_token("jb.pmap_cs.custom_trust", &token);
+			if (trust && xpc_get_type(trust) == XPC_TYPE_STRING
+				&& strcmp(xpc_string_get_string_ptr(trust), "PMAP_CS_APP_STORE") == 0) {
+				status = proc_set_txm_main_local_signing_trust(proc);
+			}
+		}
+	}
+	proc_rele(proc);
+	return status;
+}
+
 int roothide_launchd___posix_spawn_posthook(pid_t *restrict pidp, const char *restrict path, struct _posix_spawn_args_desc *desc, char *const argv[restrict], char *const envp[restrict])
 {
 	//spawn_prehook ensure this is always available
@@ -220,42 +268,6 @@ int roothide_launchd___posix_spawn_posthook(pid_t *restrict pidp, const char *re
 	return ret;
 }
 
-void trust_tslite_app_bundle(const char* executable)
-{
-	//this comes from spawn_prehook so the main executable has not been trusted when spawn a ts app first time
-
-	int fd = open(executable, O_RDONLY);
-	if(fd < 0) {
-		JBLogError("Failed to open tslite app bundle: err=%d,path=%s", errno, executable);
-		return;
-	}
-
-	struct fgetsigsinfo siginfo = {0, GETSIGSINFO_PLATFORM_BINARY, 0};
-	int sigret = fcntl(fd, F_GETSIGSINFO, &siginfo);
-	int sigerr = errno;
-	close(fd);
-
-	if(sigret != 0 && sigerr != ENOENT) {
-		JBLogError("Failed to get signature for tslite app: err=%d,path=%s", sigerr, executable);
-		return;
-	}
-
-	if (siginfo.fg_sig_is_platform != 0) {
-		JBLogDebug("tslite app has already been trusted: %s", executable);
-		return;
-	}
-
-	NSString* bundlePath = getAppBundlePathFromSpawnPath(executable);
-	if (!bundlePath) {
-		JBLogError("Failed to find tslite app bundle for %s", executable ? executable : "(null)");
-		return;
-	}
-
-	if(jb_trustcache_add_directory(bundlePath.fileSystemRepresentation, true) != 0) {
-		JBLogError("Failed to add tslite app bundle to trust cache: %s", bundlePath.fileSystemRepresentation);
-	}
-}
-
 int __blacklisted_posix_spawn_orig_wrapper(pid_t *restrict pidp, const char *restrict path, struct _posix_spawn_args_desc *desc, char *const argv[restrict], char *const envp[restrict])
 {
 	if(!path || !hasTrollstoreLiteMarker(path))
@@ -263,7 +275,7 @@ int __blacklisted_posix_spawn_orig_wrapper(pid_t *restrict pidp, const char *res
 		return __posix_spawn_orig_wrapper(pidp, path, desc, argv, envp);
 	}
 
-	trust_tslite_app_bundle(path);
+	// 黑名单入口已经完成整包信任，避免再次打开所有资源文件。
 
 	//spawn_prehook ensure this is always available
 	posix_spawnattr_t attrp = &desc->attrp;
@@ -433,6 +445,10 @@ int roothide_launchd___posix_spawn_prehook(pid_t *restrict pidp, const char *res
 	bool roothideBlacklisted = isBlacklistedPath(path);
 	if (choicyBlocked || roothideBlacklisted)
 	{
+		int trustStatus = trust_trollstore_lite_bundle_before_spawn(path);
+		if (trustStatus != 0)
+			return trustStatus;
+
 		int ret;
 
 		JBLogDebug("blacklisted app %s", path);
@@ -462,12 +478,19 @@ int roothide_launchd___posix_spawn_prehook(pid_t *restrict pidp, const char *res
 			/* and posix_spawn->kernel->amfid->launchd may cause xpc dead loop so we can't use lock-spawn-unlock here */
 	
 			volatile pid_t* blacklistedPidp = allocBlacklistProcessId();
+			short originalFlags = 0;
+			posix_spawnattr_getflags(attrp, &originalFlags);
+			bool patchTXM = txm_local_signing_supported() && hasTrollstoreLiteMarker(path);
+			if (patchTXM) {
+				posix_spawnattr_setflags(attrp, originalFlags | POSIX_SPAWN_START_SUSPENDED);
+			}
 	
 			if(roothideBlacklisted || !dyld_patch_enabled() || !iOS15Arm64e) {
 				ret = __blacklisted_posix_spawn_orig_wrapper(blacklistedPidp, path, desc, argv, envc);
 			} else {
 				ret = roothide_launchd___posix_spawn__spinlock_fix_only(blacklistedPidp, path, desc, argv, envc);
 			}
+			posix_spawnattr_setflags(attrp, originalFlags);
 	
 			pid_t pid = *blacklistedPidp;
 			if(pidp) *pidp = *blacklistedPidp;
@@ -478,10 +501,21 @@ int roothide_launchd___posix_spawn_prehook(pid_t *restrict pidp, const char *res
 			envbuf_free(envc);
 				
 			if(ret==0 && pid>0) {
-				short flags = 0;
-				posix_spawnattr_getflags(attrp, &flags);
-				if((flags & POSIX_SPAWN_START_SUSPENDED) != 0) {
+				// 与 Relaxin 一致，仅按调用方原始挂起标志保留兼容处理。
+				// 为修补主签名临时挂起，不应额外开启 allowsInvalidCode。
+				if((originalFlags & POSIX_SPAWN_START_SUSPENDED) != 0) {
 					platform_set_process_debugged(pid, false);
+				}
+				if (patchTXM) {
+					ret = patch_trollstore_lite_trust_before_resume(pid);
+					// 调用方要求挂起时由调用方恢复，避免提前执行应用代码。
+					if (ret == 0 && !(originalFlags & POSIX_SPAWN_START_SUSPENDED)) {
+						if (kill(pid, SIGCONT) != 0) ret = errno;
+					}
+					if (ret != 0) {
+						JBLogError("blacklisted TXM trust failed path=%s pid=%d status=%d", path, pid, ret);
+						kill(pid, SIGKILL);
+					}
 				}
 			}
 		}
