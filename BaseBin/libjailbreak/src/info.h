@@ -363,7 +363,13 @@ struct system_info {
 		struct {
 			uint32_t allowsInvalidCode;
 			uint32_t codeRegions;
+			uint32_t mainRegion;
 		} TXMAddressSpace;
+
+		struct {
+			uint32_t codeDirectory;
+			uint32_t trustPair;
+		} TXMCodeSignature;
 
 		struct {
 			uint32_t active;
@@ -661,6 +667,9 @@ extern struct system_info gSystemInfo;
 	\
 	iterator(ctx, kernelStruct.TXMAddressSpace.allowsInvalidCode); \
 	iterator(ctx, kernelStruct.TXMAddressSpace.codeRegions); \
+	iterator(ctx, kernelStruct.TXMAddressSpace.mainRegion); \
+	iterator(ctx, kernelStruct.TXMCodeSignature.codeDirectory); \
+	iterator(ctx, kernelStruct.TXMCodeSignature.trustPair); \
 	\
 	iterator(ctx, kernelStruct.TXMCodeRegion.active); \
 	iterator(ctx, kernelStruct.TXMCodeRegion.type); \

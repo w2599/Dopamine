@@ -419,6 +419,13 @@ void jbinfo_initialize_hardcoded_offsets(void)
 										gSystemInfo.kernelStruct.TXMAddressSpace.allowsInvalidCode = 0x20;
 										gSystemInfo.kernelStruct.TXMAddressSpace.codeRegions       = 0x30;
 
+										// 与 Relaxin 一致，仅启用已知 XNU 版本的签名布局。
+										if (xnuVersion.major == 10002 || xnuVersion.major == 10063) {
+											gSystemInfo.kernelStruct.TXMAddressSpace.mainRegion = 0x40;
+											gSystemInfo.kernelStruct.TXMCodeSignature.codeDirectory = 0x58;
+											gSystemInfo.kernelStruct.TXMCodeSignature.trustPair = 0xC8;
+										}
+
 										gSystemInfo.kernelStruct.TXMCodeRegion.active        = 0x11;
 										gSystemInfo.kernelStruct.TXMCodeRegion.type          = 0x12;
 										gSystemInfo.kernelStruct.TXMCodeRegion.nestedSpace   = 0x18;
