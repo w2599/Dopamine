@@ -5,6 +5,8 @@ all: Dopamine.ipa
 Dopamine.ipa: build/Build/Products/Debug-iphoneos/Dopamine.app
 	# 暂不打包 1800，同时移除旧构建目录遗留的副本。
 	rm -f build/Build/Products/Debug-iphoneos/Dopamine.app/bootstrap_1800.tar.zst
+	# 不再打包 palera1n，并清理增量构建中的旧框架。
+	rm -rf build/Build/Products/Debug-iphoneos/Dopamine.app/Frameworks/palera1n.framework
 	@echo Ad-Hoc signing Dopamine
 	xattr -rc build/Build/Products/Debug-iphoneos/Dopamine.app
 	ldid -SDopamine/Dopamine.entitlements build/Build/Products/Debug-iphoneos/Dopamine.app/Dopamine
@@ -30,14 +32,9 @@ endif
 	plutil -replace CFBundleIdentifier -string "cn.zqbb.dopaRH" build/Build/Products/Debug-iphoneos/Dopamine.app/Info.plist
 	plutil -replace CFBundleShortVersionString -string "$(shell cat ../BaseBin/_external/basebin/.version)-$(shell cat ../BaseBin/_external/basebin/.version-roothide)" build/Build/Products/Debug-iphoneos/Dopamine.app/Info.plist
 	plutil -replace DOBuildTimestamp -integer "$(BUILD_TIMESTAMP)" build/Build/Products/Debug-iphoneos/Dopamine.app/Info.plist
-# ifeq ($(PALEHIDE), 1)
-	make -C Dopamine/Exploits/palera1n package
-	cp -a Dopamine/Exploits/palera1n/.framework build/Build/Products/Debug-iphoneos/Dopamine.app/Frameworks/palera1n.framework
-# endif
 
 
 clean:
-	make -C Dopamine/Exploits/palera1n clean
 	rm -rf build Payload Dopamine.ipa Dopamine.tipa
 
 build_clean:
