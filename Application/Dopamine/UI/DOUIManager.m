@@ -12,6 +12,9 @@
 #import "NSString+Version.h"
 #import <pthread.h>
 
+// 关闭远程版本检测；改为 YES 即可恢复原有检测与发布信息请求。
+static const BOOL DOVersionUpdateCheckEnabled = NO;
+
 @implementation DOUIManager
 
 + (instancetype)sharedInstance
@@ -37,6 +40,8 @@
 
 - (BOOL)isUpdateAvailable
 {
+    if (!DOVersionUpdateCheckEnabled) return NO;
+
     NSString *latestVersion = [self getLatestReleaseTag];
     NSString *currentVersion = [self getLaunchedReleaseTag];
     return [latestVersion numericalVersionRepresentation] > [currentVersion numericalVersionRepresentation];
@@ -68,6 +73,8 @@
 
 - (NSArray *)getLatestReleases
 {
+    if (!DOVersionUpdateCheckEnabled) return @[];
+
     static dispatch_once_t onceToken;
     static NSArray *releases;
     dispatch_once(&onceToken, ^{
