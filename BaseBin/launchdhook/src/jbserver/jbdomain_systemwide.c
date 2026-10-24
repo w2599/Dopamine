@@ -360,7 +360,8 @@ int txm_fix_trustlevel(uint64_t);
 			const char *customTrustStr = xpc_string_get_string_ptr(customTrustObj);
 			uint32_t customTrust = pmap_cs_trust_string_to_int(customTrustStr);
 
-			if (host_is_arm64e()) {
+			// SPTM 使用 TXM 签名租约，不能按旧 PPL 链表解释 pmap 中的 ASID。
+			if (host_is_arm64e() && !ksymbol(SPTMArgs)) {
 				if (customTrust >= 2) {
 					uint64_t mainCodeDir = proc_find_main_binary_code_dir(proc);
 					if (mainCodeDir) {
