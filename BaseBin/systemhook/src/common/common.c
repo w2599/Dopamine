@@ -1,5 +1,6 @@
 #include "common.h"
 #include "_zqbb.h"
+#include <errno.h>
 #include <limits.h>
 #include "../roothider.h"
 #include <xpc/xpc.h>
@@ -165,6 +166,7 @@ kSpawnConfig roothide_spawn_config_for_executable(const char* path, char *const 
 // 3. Increase Jetsam limit to more sane value (Multipler defined as JETSAM_MULTIPLIER)
 // 4. Fix spawning as root via persona entitlement on iOS 17.6+
 
+// 统一处理启动环境和权限，仅在成功取得子进程后修复 persona。
 static int spawn_exec_hook_common(bool isExec,
 						   const char *path,
 						   char *const argv[restrict],
@@ -181,14 +183,13 @@ static int spawn_exec_hook_common(bool isExec,
 	bool personaFixNeedsResume = true;
 	int personaFixUid = -1;
 	int personaFixGid = -1;
+	struct _posix_spawn_persona_info *modifiedPersona = NULL;
+	short personaOriginalFlags = 0;
 	posix_spawnattr_t attr = NULL;
 	if (desc) attr = desc->attrp;
 
 	// We need to track every modification we make to attr and revert them before returning
 	// This is because the caller may reuse the struct for another posix_spawn call
-	bool personaModified = false, flagsModified = false;
-	int personaOrigUid = -1, personaOrigGid = -1;
-	short origFlags = 0;
 	int memlimitActiveOrig = -1, memlimitInactiveOrig = -1;
 
 	kSpawnConfig spawnConfig = spawn_config_for_executable(path, argv);
@@ -302,12 +303,9 @@ static int spawn_exec_hook_common(bool isExec,
 				}
 
 				if (personaFixUid == 0 || personaFixGid == 0) {
-					// Backup previous state
-					personaModified = true;
-					personaOrigUid = personaInfo->pspi_uid;
-					personaOrigGid = personaInfo->pspi_gid;
-
-					// Revert any request to become root back to our uid/gid
+					modifiedPersona = personaInfo;
+					personaOriginalFlags = flags;
+					// 将临时身份恢复为调用者的 uid/gid，避免启动被拒绝。
 					// Otherwise posix_spawn will straight up fail
 					if (personaFixUid == 0) personaInfo->pspi_uid = getuid();
 					if (personaFixGid == 0) personaInfo->pspi_gid = getgid();
@@ -316,9 +314,6 @@ static int spawn_exec_hook_common(bool isExec,
 						personaFixNeedsResume = false;
 					}
 					else {
-						flagsModified = true;
-						origFlags = flags;
-
 						posix_spawnattr_setflags(&attr, flags | POSIX_SPAWN_START_SUSPENDED);
 					}
 				}
@@ -327,12 +322,14 @@ static int spawn_exec_hook_common(bool isExec,
 	}
 
 	int r = -1;
+	int spawnError = 0;
 
 	pid_t childPid = -1;
 
 	if ((shouldInsertJBEnv && JBEnvAlreadyInsertedCount == 1) || (!shouldInsertJBEnv && JBEnvAlreadyInsertedCount == 0 && !hasSafeModeVariable)) {
 		// we're already good, just call orig
 		r = orig(&childPid, envp);
+		spawnError = errno;
 	}
 	else {
 		// the state we want to be in is not the state we are in right now
@@ -382,38 +379,37 @@ static int spawn_exec_hook_common(bool isExec,
 		}
 
 		r = orig(&childPid, envc);
+		spawnError = errno;
 
 		envbuf_free(envc);
 	}
 
-	if (personaFixUid == 0 || personaFixGid == 0 && childPid != -1) {
-		jbclient_persona_fix(childPid, personaFixUid, personaFixGid);
-		if (personaFixNeedsResume) {
-			kill(childPid, SIGCONT);
-		}
-	}
-
-	// Revert any modifications to attr
-	if (personaModified) {
-		struct _posix_spawn_persona_info *personaInfo = *(struct _posix_spawn_persona_info **)(attrStruct + POSIX_SPAWNATTR_OFF_PERSONA);
-		if (personaInfo) {
-			personaInfo->pspi_uid = personaOrigUid;
-			personaInfo->pspi_gid = personaOrigGid;
-		}
-	}
-	if (flagsModified) {
-		posix_spawnattr_setflags(&attr, origFlags);
-	}
+	// 无论启动是否成功，都还原调用者的 persona 和临时挂起标志。
 	if (memlimitActiveOrig != -1) {
 		*(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_ACTIVE) = memlimitActiveOrig;
 	}
 	if (memlimitInactiveOrig != -1) {
 		*(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_INACTIVE) = memlimitInactiveOrig;
 	}
+	if (modifiedPersona) {
+		if (personaFixUid == 0) modifiedPersona->pspi_uid = personaFixUid;
+		if (personaFixGid == 0) modifiedPersona->pspi_gid = personaFixGid;
+		if (personaFixNeedsResume) posix_spawnattr_setflags(&attr, personaOriginalFlags);
+	}
 
+	if (r == 0 && childPid > 0 && (personaFixUid == 0 || personaFixGid == 0)) {
+		jbclient_persona_fix(childPid, personaFixUid, personaFixGid);
+		if (personaFixNeedsResume) {
+			kill(childPid, SIGCONT);
+		}
+	}
+
+	// 底层失败通过 errno 返回，清理和子进程修复不能覆盖它。
+	errno = spawnError;
 	return r;
 }
 
+// 传递启动结果，并为调用者主动挂起的子进程启用调试映射。
 int posix_spawn_hook_shared(pid_t *restrict pid, 
 					   const char *restrict path,
 			 struct _posix_spawn_args_desc *desc,
@@ -433,6 +429,7 @@ int posix_spawn_hook_shared(pid_t *restrict pid,
 		}
 		return rr;
 	});
+	int spawnError = errno;
 
 	if (r == 0 && pid && desc) {
 		posix_spawnattr_t attr = desc->attrp;
@@ -447,6 +444,7 @@ int posix_spawn_hook_shared(pid_t *restrict pid,
 		}
 	}
 
+	errno = spawnError;
 	return r;
 }
 
