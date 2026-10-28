@@ -150,11 +150,16 @@
 
 
         [actionView hide];
-        // 展开前移出缩放容器，保留屏幕位置，让日志恢复正常尺寸。
+        // 移出缩放容器后固定动画起点，避免日志初始化布局时位置归零。
         CGRect buttonFrame = [self.jailbreakBtn convertRect:self.jailbreakBtn.bounds toView:self.view];
         [NSLayoutConstraint deactivateConstraints:self.jailbreakButtonConstraints];
         [self.view addSubview:self.jailbreakBtn];
-        self.jailbreakBtn.frame = buttonFrame;
+        [NSLayoutConstraint activateConstraints:(self.jailbreakButtonConstraints = @[
+            [self.jailbreakBtn.leftAnchor constraintEqualToAnchor:self.view.leftAnchor constant:CGRectGetMinX(buttonFrame)],
+            [self.jailbreakBtn.topAnchor constraintEqualToAnchor:self.view.topAnchor constant:CGRectGetMinY(buttonFrame)],
+            [self.jailbreakBtn.widthAnchor constraintEqualToConstant:CGRectGetWidth(buttonFrame)],
+            [self.jailbreakBtn.heightAnchor constraintEqualToConstant:CGRectGetHeight(buttonFrame)]
+        ])];
         [self.jailbreakBtn expandButton: self.jailbreakButtonConstraints];
 
         self.updateButton.userInteractionEnabled = NO;
@@ -433,7 +438,7 @@
     [NSLayoutConstraint activateConstraints:@[
         [self.updateButton.centerXAnchor constraintEqualToAnchor:self.contentView.centerXAnchor],
         [self.updateButton.heightAnchor constraintEqualToConstant:30],
-        [self.updateButton.bottomAnchor constraintEqualToAnchor:self.jailbreakBtn.topAnchor constant:[DOGlobalAppearance isHomeButtonDevice] ? -10 : -20]
+        [self.updateButton.bottomAnchor constraintEqualToAnchor:self.mainStack.arrangedSubviews.lastObject.topAnchor constant:[DOGlobalAppearance isHomeButtonDevice] ? -10 : -20]
     ]];
 
     [self.updateButton setTransform:CGAffineTransformMakeTranslation(0, 25)];
