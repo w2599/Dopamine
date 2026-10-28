@@ -28,7 +28,7 @@ sign: $(TARGET)
 $(TARGET): $(wildcard src/*.[cSm] src/common/*.[cSm] ../libjailbreak/src/jbclient_*.c ../libjailbreak/src/inline_svc.[cS] ../libjailbreak/src/hookd.c ../_external/modules/litehook/src/*.c)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
-$(TARGET): ../libroothider/src/jailbreakd.c roothider_inline.o
+$(TARGET): ../libroothider/src/jailbreakd.c ../libroothider/src/_configuration.c roothider_inline.o
 
 clean:
 	@rm -f $(TARGET)

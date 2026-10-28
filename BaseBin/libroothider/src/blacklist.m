@@ -2,6 +2,7 @@
 
 #include <libjailbreak/libjailbreak.h>
 #include "common.h"
+#include "_configuration.h"
 
 
 #define APP_PATH_PREFIX "/private/var/containers/Bundle/Application/"
@@ -66,23 +67,15 @@ NSSet* builtinApps()
     return apps;
 }
 
+// 从共享配置快照查询应用黑名单。
 bool isBlacklistedApp(const char* identifier)
 {
     if(!identifier) return false;
 
     if([builtinApps() containsObject:@(identifier)]) return false;
 
-    NSString* configFilePath = JBROOT_PATH(@"/var/mobile/Library/RootHide/RootHideConfig.plist");
-    NSDictionary* roothideConfig = [NSDictionary dictionaryWithContentsOfFile:configFilePath];
-    if(!roothideConfig) return false;
-
-    NSDictionary* appconfig = roothideConfig[@"appconfig"];
-    if(!appconfig) return false;
-
-    NSNumber* blacklisted = appconfig[@(identifier)];
-    if(!blacklisted) return false;
-
-    return blacklisted.boolValue;
+    return zqbb_dictionary_bool_value(identifier, "appconfig",
+        JBROOT_PATH("/var/mobile/Library/RootHide/RootHideConfig.plist"));
 }
 
 // 按原有应用标识黑名单判断。
@@ -102,11 +95,8 @@ bool zqbb_wantsInject(const char *execName, const char *injectPath);
 static BOOL zqbb_wantsBlacklist(NSString *execName) {
     if(!execName) return NO;
 
-    NSString* configFilePath = JBROOT_PATH(@"/var/mobile/Library/RootHide/cn.zqbb.inject.wantsblacklist.plist");
-    NSDictionary* wantsBlacklistConfig = [NSDictionary dictionaryWithContentsOfFile:configFilePath];
-    if(!wantsBlacklistConfig) return NO;
-
-    return [wantsBlacklistConfig[execName] boolValue];
+    return zqbb_dictionary_bool_value(execName.UTF8String, NULL,
+        JBROOT_PATH("/var/mobile/Library/RootHide/cn.zqbb.inject.wantsblacklist.plist"));
 }
 
 // 按可执行文件名判断白名单，并应用指定进程的黑名单覆盖。

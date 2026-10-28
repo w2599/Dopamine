@@ -19,6 +19,7 @@
 #include <libjailbreak/util.h>
 #include <libjailbreak/jbroot.h>
 #include <libjailbreak/hookd.h>
+#include <libroothider/_configuration.h>
 #include <libkern/OSCacheControl.h>
 
 bool string_has_prefix(const char *str, const char* prefix)
@@ -66,62 +67,18 @@ void string_enumerate_components(const char *string, const char *separator, void
 	free(stringCopy);
 }
 
-int timespec_compare(struct timespec *t1, struct timespec *t2)
+// 独立持有配置值，避免并发刷新时释放正在遍历的黑名单。
+static XPC_RETURNS_RETAINED xpc_object_t jbuserconfig_copy_value(const char *key)
 {
-	if (t1->tv_sec == t2->tv_sec && t1->tv_nsec == t2->tv_nsec) return 0;
-
-	if (t1->tv_sec == t2->tv_sec) {
-		return t1->tv_nsec > t2->tv_nsec ? 1 : -1;
-	}
-	else {
-		return t1->tv_sec > t2->tv_sec ? 1 : -1;
-	}
+	xpc_object_t config = zqbb_read_dictionary(JBROOT_PATH("/basebin/config.plist"));
+	if (!config) return NULL;
+	xpc_object_t value = xpc_dictionary_get_value(config, key);
+	if (value) xpc_retain(value);
+	xpc_release(config);
+	return value;
 }
 
-xpc_object_t xpc_object_from_plist(const char *path)
-{
-	xpc_object_t xObj = NULL;
-	int ldFd = open(path, O_RDONLY);
-	if (ldFd >= 0) {
-		struct stat s = {};
-		if(fstat(ldFd, &s) != 0) {
-			close(ldFd);
-			return NULL;
-		}
-		size_t len = s.st_size;
-		void *addr = mmap(NULL, len, PROT_READ, MAP_FILE | MAP_PRIVATE, ldFd, 0);
-		if (addr != MAP_FAILED) {
-			close(ldFd);
-
-			xObj = xpc_create_from_plist(addr, len);
-			munmap(addr, len);
-		}
-	}
-	return xObj;
-}
-
-xpc_object_t jbuserconfig_get_value(const char *key)
-{
-	const char *configPath = JBROOT_PATH("/basebin/config.plist");
-	if (!access(configPath, R_OK)) {
-		static xpc_object_t configDict = NULL;
-		static struct timespec lastConfigWrite = { .tv_sec=0, .tv_nsec = 0 };
-
-		struct stat configStat;
-		if (stat(configPath, &configStat) == 0) {
-			if (timespec_compare(&configStat.st_mtimespec, &lastConfigWrite) > 0) {
-				lastConfigWrite = configStat.st_mtimespec;
-				if (configDict) xpc_release(configDict);
-				configDict = xpc_object_from_plist(configPath);
-			}
-		}
-
-		return xpc_dictionary_get_value(configDict, key);
-	}
-
-	return NULL;
-}
-
+// 根据黑名单和注入白名单确定进程启动策略。
 static kSpawnConfig spawn_config_for_executable(const char* path, char *const argv[restrict])
 {
 	// Blacklist to ensure general system stability
@@ -138,13 +95,18 @@ static kSpawnConfig spawn_config_for_executable(const char* path, char *const ar
 		if (!strcmp(processBlacklist[i], path)) return 0;
 	}
 
-	xpc_object_t userBlacklist = jbuserconfig_get_value("ProcessBlacklist");
+	xpc_object_t userBlacklist = jbuserconfig_copy_value("ProcessBlacklist");
 	if (userBlacklist && xpc_get_type(userBlacklist) == XPC_TYPE_ARRAY) {
 		size_t userBlacklistCount = xpc_array_get_count(userBlacklist);
 		for (size_t i = 0; i < userBlacklistCount; i++) {
-			if (!strcmp(xpc_array_get_string(userBlacklist, i), path)) return kSpawnConfigTrust;
+			const char *blacklistedPath = xpc_array_get_string(userBlacklist, i);
+			if (blacklistedPath && !strcmp(blacklistedPath, path)) {
+				xpc_release(userBlacklist);
+				return kSpawnConfigTrust;
+			}
 		}
 	}
+	if (userBlacklist) xpc_release(userBlacklist);
 
     // 白名单文件存在时，仅允许匹配的进程注入。
     const char *injectPath = JBROOT_PATH("/var/mobile/Library/RootHide/cn.zqbb.inject.plist");

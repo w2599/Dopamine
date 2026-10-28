@@ -1,6 +1,7 @@
 #include "_zqbb.h"
 #include <libroothider/_configuration.h>
 #include <limits.h>
+#include <string.h>
 
 // 查询用户是否允许指定可执行文件注入。
 bool zqbb_wantInject(const char *execName, const char *injectPath)
