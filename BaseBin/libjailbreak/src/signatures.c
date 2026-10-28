@@ -265,6 +265,7 @@ CS_SuperBlob *siginfo_resolve_superblob(struct siginfo *siginfo, int pid, int fd
 	return superblob;
 }
 
+// 信任签名并按需附加，缓存追加失败时立即返回错误。
 int trust_signatures(int pid, int fd, struct siginfo *sigInfos, uint32_t sigInfoCount)
 {
 	if (sigInfoCount == 0) return 0;
@@ -343,11 +344,16 @@ int trust_signatures(int pid, int fd, struct siginfo *sigInfos, uint32_t sigInfo
 		}
 	}
 
+	int r = 0;
 	if (cdhashesCount > 0) {
-		jb_trustcache_add_cdhashes(cdhashes, cdhashesCount);
+		r = jb_trustcache_add_cdhashes(cdhashes, cdhashesCount);
+		if (r != 0) {
+			free(sigInfosToAttach);
+			free(cdhashes);
+			return r;
+		}
 	}
 
-	int r = 0;
 	if (sigInfosToAttachCount > 0) {
 		// For every signature we have modified, we need to attach them to fd now
 		for (uint32_t i = 0; i < sigInfosToAttachCount; i++) {
