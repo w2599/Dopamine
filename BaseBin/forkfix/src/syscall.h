@@ -3,6 +3,8 @@ pid_t ffsys_fork(void);
 pid_t ffsys_getpid(void);
 int ffsys_pid_suspend(pid_t pid);
 
+// 读写失败返回负 errno，不触碰 fork 后尚未修复的 libc 状态。
 ssize_t ffsys_read(int fildes, void *buf, size_t nbyte);
 ssize_t ffsys_write(int fildes, const void *buf, size_t nbyte);
 int ffsys_close(int fildes);
+__attribute__((noreturn)) void ffsys_exit(int status);

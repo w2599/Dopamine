@@ -54,12 +54,14 @@ _ffsys_pid_suspend:
 _ffsys_read:
 	mov x16, #3
 	svc 0x80
+	cneg x0, x0, cs
 	ret
 
 .global _ffsys_write
 _ffsys_write:
 	mov x16, #4
 	svc 0x80
+	cneg x0, x0, cs
 	ret
 
 .global _ffsys_close
@@ -67,3 +69,9 @@ _ffsys_close:
 	mov x16, #6
 	svc 0x80
 	ret
+
+.global _ffsys_exit
+_ffsys_exit:
+	mov x16, #1
+	svc 0x80
+	brk #0

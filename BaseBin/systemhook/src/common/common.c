@@ -54,15 +54,18 @@ bool string_has_suffix(const char* str, const char* suffix)
 	return !strcmp(str + str_len - suffix_len, suffix);
 }
 
+// 独立保存分段状态，允许回调重入并保留调用方的 strtok 状态。
 void string_enumerate_components(const char *string, const char *separator, void (^enumBlock)(const char *pathString, bool *stop))
 {
 	char *stringCopy = strdup(string);
-	char *curString = strtok(stringCopy, separator);
+	if (!stringCopy) return;
+	char *state = NULL;
+	char *curString = strtok_r(stringCopy, separator, &state);
 	while (curString != NULL) {
 		bool stop = false;
 		enumBlock(curString, &stop);
 		if (stop) break;
-		curString = strtok(NULL, separator);
+		curString = strtok_r(NULL, separator, &state);
 	}
 	free(stringCopy);
 }
@@ -268,7 +271,6 @@ static int spawn_exec_hook_common(bool isExec,
 					modifiedPersona = personaInfo;
 					personaOriginalFlags = flags;
 					// 将临时身份恢复为调用者的 uid/gid，避免启动被拒绝。
-					// Otherwise posix_spawn will straight up fail
 					if (personaFixUid == 0) personaInfo->pspi_uid = getuid();
 					if (personaFixGid == 0) personaInfo->pspi_gid = getgid();
 
