@@ -24,6 +24,7 @@ bool roothide_domain_allowed(audit_token_t clientToken)
 
 void recurse_collect_untrusted_cdhashes(const char *path, const char *callerImagePath, const char *callerExecutablePath, const char *workingDir, preferredArchInfo* preferredArch, cdhash_t **cdhashesOut, uint32_t *cdhashCountOut);
 
+// 递归收集依赖散列，并向调用方传递缓存追加错误。
 static int trust_macho_recurse(const char *machoPath, const char *dlopenCallerImagePath, const char *dlopenCallerExecutablePath, const char *workingDir, xpc_object_t preferredArchsArray)
 {
 	if(!machoPath || !dlopenCallerExecutablePath) return -1;
@@ -47,11 +48,12 @@ static int trust_macho_recurse(const char *machoPath, const char *dlopenCallerIm
 	cdhash_t *cdhashes = NULL;
 	uint32_t cdhashesCount = 0;
 	recurse_collect_untrusted_cdhashes(machoPath, dlopenCallerImagePath, dlopenCallerExecutablePath, workingDir, &preferredArch, &cdhashes, &cdhashesCount);
+	int r = 0;
 	if (cdhashes && cdhashesCount > 0) {
-		jb_trustcache_add_cdhashes(cdhashes, cdhashesCount);
-		free(cdhashes);
+		r = jb_trustcache_add_cdhashes(cdhashes, cdhashesCount);
 	}
-	return 0;
+	free(cdhashes);
+	return r;
 }
 
 int roothide_trust_executable_recurse(const char *executablePath, const char *processWorkingDir, xpc_object_t preferredArchsArray)

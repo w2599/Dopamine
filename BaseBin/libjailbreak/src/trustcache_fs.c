@@ -77,31 +77,33 @@ void directory_collect_untrusted_cdhashes_by_path(const char *directoryPath, boo
 	*cdhashCountOut = cdhashCount;
 }
 
+// 收集单个文件的散列，并返回缓存追加结果。
 int jb_trustcache_add_file(const char *filePath)
 {
 	cdhash_t *cdhashes = NULL;
 	uint32_t cdhashCount = 0;
 	file_collect_untrusted_cdhashes_by_path(filePath, &cdhashes, &cdhashCount);
 
+	int r = 0;
 	if (cdhashes && cdhashCount > 0) {
-		jb_trustcache_add_cdhashes(cdhashes, cdhashCount);
-		free(cdhashes);
+		r = jb_trustcache_add_cdhashes(cdhashes, cdhashCount);
 	}
-
-	return 0;
+	free(cdhashes);
+	return r;
 }
 
+// 收集目录中的散列，并返回缓存追加结果。
 int jb_trustcache_add_directory(const char *directoryPath, bool recursive)
 {
 	cdhash_t *cdhashes = NULL;
 	uint32_t cdhashCount = 0;
 
 	directory_collect_untrusted_cdhashes_by_path(directoryPath, recursive, &cdhashes, &cdhashCount);
+	int r = 0;
 	if (cdhashes && cdhashCount > 0) {
 		printf("Added %u cdhashes\n", cdhashCount);
-		jb_trustcache_add_cdhashes(cdhashes, cdhashCount);
-		free(cdhashes);
+		r = jb_trustcache_add_cdhashes(cdhashes, cdhashCount);
 	}
-
-	return 0;
+	free(cdhashes);
+	return r;
 }
