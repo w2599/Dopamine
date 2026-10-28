@@ -21,6 +21,8 @@
 @interface DOMainViewController ()
 
 @property DOJailbreakButton *jailbreakBtn;
+@property UIStackView *mainStack;
+@property UIView *contentView;
 @property UILabel *appBuildInfoLabel;
 @property UILabel *appBuildTimeLabel;
 @property UILabel *systemVersionLabel;
@@ -44,42 +46,22 @@
 // 组合主页信息列、操作菜单与越狱按钮。
 -(void)setupStack
 {
-    UIStackView *stackView = [[UIStackView alloc] init];
+    self.contentView = [[UIView alloc] initWithFrame:self.view.bounds];
+    [self.view addSubview:self.contentView];
+    UIStackView *stackView = self.mainStack = [[UIStackView alloc] init];
     [stackView setAxis:UILayoutConstraintAxisVertical];
     [stackView setAlignment:UIStackViewAlignmentTrailing];
     [stackView setDistribution:UIStackViewDistributionEqualSpacing];
+    stackView.spacing = 16;
     [stackView setTranslatesAutoresizingMaskIntoConstraints:NO];
 
-    [self.view addSubview:stackView];
-
-
-    int statusBarHeight = fmax(15, [[UIApplication sharedApplication] keyWindow].safeAreaInsets.top - 20);
-
+    [self.contentView addSubview:stackView];
     [NSLayoutConstraint activateConstraints:@[
-        [stackView.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor constant:statusBarHeight],//-35
-        [stackView.heightAnchor constraintEqualToAnchor:self.view.heightAnchor multiplier:[DOGlobalAppearance isHomeButtonDevice] ? 0.78 : 0.73]
+        [stackView.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor],
+        [stackView.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor],
+        [stackView.topAnchor constraintEqualToAnchor:self.contentView.topAnchor],
+        [stackView.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor],
     ]];
-
-    if ([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad)
-    {
-        NSLayoutConstraint *relativeWidthConstraint = [stackView.widthAnchor constraintEqualToAnchor:self.view.widthAnchor multiplier:0.8];
-        relativeWidthConstraint.priority = UILayoutPriorityDefaultHigh;
-        NSLayoutConstraint *maxWidthConstraint = [stackView.widthAnchor constraintLessThanOrEqualToConstant:UI_IPAD_MAX_WIDTH];
-        maxWidthConstraint.priority = UILayoutPriorityRequired;
-
-        [NSLayoutConstraint activateConstraints:@[
-            relativeWidthConstraint,
-            maxWidthConstraint,
-            [stackView.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor]
-        ]];
-    }
-    else
-    {
-        [NSLayoutConstraint activateConstraints:@[
-            [stackView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:UI_PADDING],
-            [stackView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-UI_PADDING],
-        ]];
-    }
 
     //Header
     DOHeaderView *headerView = [[DOHeaderView alloc] initWithImage: [UIImage imageNamed:@"Dopamine"] subtitles: @[
@@ -136,7 +118,7 @@
     [buttonPlaceHolder setTranslatesAutoresizingMaskIntoConstraints:NO];
     [stackView addArrangedSubview:buttonPlaceHolder];
     [NSLayoutConstraint activateConstraints:@[
-        [buttonPlaceHolder.heightAnchor constraintEqualToConstant:60]
+        [buttonPlaceHolder.heightAnchor constraintEqualToConstant:60],
     ]];
     
     //Jailbreak Button
@@ -168,6 +150,11 @@
 
 
         [actionView hide];
+        // 展开前移出缩放容器，保留屏幕位置，让日志恢复正常尺寸。
+        CGRect buttonFrame = [self.jailbreakBtn convertRect:self.jailbreakBtn.bounds toView:self.view];
+        [NSLayoutConstraint deactivateConstraints:self.jailbreakButtonConstraints];
+        [self.view addSubview:self.jailbreakBtn];
+        self.jailbreakBtn.frame = buttonFrame;
         [self.jailbreakBtn expandButton: self.jailbreakButtonConstraints];
 
         self.updateButton.userInteractionEnabled = NO;
@@ -181,7 +168,7 @@
     }]];
     self.jailbreakBtn.enabled = !isJailbroken && isSupported;
 
-    [self.view addSubview:self.jailbreakBtn];
+    [self.contentView addSubview:self.jailbreakBtn];
 
     [NSLayoutConstraint activateConstraints:(self.jailbreakButtonConstraints = @[
         [self.jailbreakBtn.leadingAnchor constraintEqualToAnchor:stackView.leadingAnchor],
@@ -204,6 +191,24 @@
             });
         }
     });
+}
+
+// 按安全区与内容自然尺寸计算统一比例，同步缩放文字、图标、按钮和间距。
+- (void)viewDidLayoutSubviews
+{
+    [super viewDidLayoutSubviews];
+    if (self.jailbreakBtn.didExpand) return;
+    CGRect safeFrame = self.view.safeAreaLayoutGuide.layoutFrame;
+    BOOL isPad = UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad;
+    CGFloat width = isPad ? MIN(safeFrame.size.width * 0.8, UI_IPAD_MAX_WIDTH) : MAX(375, safeFrame.size.width) - UI_PADDING * 2;
+    CGFloat availableHeight = MIN(safeFrame.size.height - 24, self.view.bounds.size.height * ([DOGlobalAppearance isHomeButtonDevice] ? 0.78 : 0.73));
+    if (width <= 0 || availableHeight <= 0) return;
+    CGSize size = [self.mainStack systemLayoutSizeFittingSize:CGSizeMake(width, 0) withHorizontalFittingPriority:UILayoutPriorityRequired verticalFittingPriority:UILayoutPriorityFittingSizeLevel];
+    CGFloat height = MAX(size.height, availableHeight);
+    CGFloat scale = MIN(1, MIN((safeFrame.size.width - UI_PADDING * 2) / width, availableHeight / height));
+    self.contentView.bounds = CGRectMake(0, 0, width, height);
+    self.contentView.center = CGPointMake(CGRectGetMidX(safeFrame), CGRectGetMidY(safeFrame));
+    self.contentView.transform = CGAffineTransformMakeScale(scale, scale);
 }
 
 - (NSString *)jailbreakButtonTitle
@@ -420,10 +425,13 @@
     }] chevron:NO];
 
     self.updateButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.view addSubview:self.updateButton];
+    [self.contentView addSubview:self.updateButton];
+
+    // 为更新入口预留间距，随内容一起参与小屏布局。
+    [self.mainStack setCustomSpacing:[DOGlobalAppearance isHomeButtonDevice] ? 50 : 60 afterView:self.mainStack.arrangedSubviews[1]];
 
     [NSLayoutConstraint activateConstraints:@[
-        [self.updateButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
+        [self.updateButton.centerXAnchor constraintEqualToAnchor:self.contentView.centerXAnchor],
         [self.updateButton.heightAnchor constraintEqualToConstant:30],
         [self.updateButton.bottomAnchor constraintEqualToAnchor:self.jailbreakBtn.topAnchor constant:[DOGlobalAppearance isHomeButtonDevice] ? -10 : -20]
     ]];
