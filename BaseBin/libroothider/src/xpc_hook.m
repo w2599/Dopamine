@@ -13,17 +13,21 @@
 #include "common.h"
 #include "log.h"
 
+// 按进程 uniqueid 缓存最近使用的任务信息，限制常驻进程的累计占用。
 NSDictionary* cachedJobInfo(pid_t pid, bool blacklised)
 {
 	static NSMutableDictionary* cachedData = nil;
+	static NSMutableOrderedSet<NSNumber *> *cacheOrder = nil;
+	const NSUInteger cacheLimit = 256;
 
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
 		cachedData = [NSMutableDictionary new];
+		cacheOrder = [NSMutableOrderedSet new];
 	});
 
-	volatile NSDictionary* jobInfo = nil;
-	volatile uint64_t cacheKey = get_job_cache(pid);
+	NSDictionary* jobInfo = nil;
+	uint64_t cacheKey = get_job_cache(pid);
 	if(cacheKey==0 && blacklised) {
 		//spawn--->register race
 		register_job(pid); cacheKey = get_job_cache(pid);
@@ -32,7 +36,8 @@ NSDictionary* cachedJobInfo(pid_t pid, bool blacklised)
 	{
 		@synchronized (cachedData)
 		{
-			jobInfo = cachedData[@(cacheKey)];
+			NSNumber *key = @(cacheKey);
+			jobInfo = cachedData[key];
 			if (!jobInfo)
 			{
 				char path[PATH_MAX] = {0};
@@ -46,8 +51,15 @@ NSDictionary* cachedJobInfo(pid_t pid, bool blacklised)
 					@"path":@(path)
 				};
 				
-				cachedData[@(cacheKey)] = jobInfo;
+				if (cachedData.count >= cacheLimit) {
+					NSNumber *oldest = cacheOrder.firstObject;
+					[cachedData removeObjectForKey:oldest];
+					[cacheOrder removeObjectAtIndex:0];
+				}
+				cachedData[key] = jobInfo;
 			}
+			[cacheOrder removeObject:key];
+			[cacheOrder addObject:key];
 		}
 	}
 	return jobInfo;
@@ -125,6 +137,7 @@ xpc_object_t new_xpc_dictionary_create_reply(xpc_object_t original)
 }
 
 int (*orig_xpc_pipe_routine_reply)(xpc_object_t reply);
+// 根据请求方身份过滤回复，并持有本次使用的任务信息。
 int new_xpc_pipe_routine_reply(xpc_object_t reply)
 {
 	if (xpc_get_type(reply) == XPC_TYPE_DICTIONARY)
@@ -187,7 +200,8 @@ int new_xpc_pipe_routine_reply(xpc_object_t reply)
 				volatile const char *bundle = bundle_identifier ? bundle_identifier : (name ? name : "");
 
 				volatile int clientPid = audit_token_to_pid(clientToken);
-				volatile char* client_identifier = [cachedJobInfo(clientPid,true)[@"identifier"] UTF8String] ?: ""; //app exit race
+				__attribute__((objc_precise_lifetime)) NSDictionary *clientJobInfo = cachedJobInfo(clientPid, true);
+				const char* client_identifier = [clientJobInfo[@"identifier"] UTF8String] ?: ""; //app exit race
 
 				volatile bool isSafeBundleIdentifier = is_safe_bundle_identifier(bundle);
 				volatile bool isSelfBundleIdentifier = client_identifier[0] && string_has_prefix(bundle, client_identifier);
@@ -268,6 +282,7 @@ void check_usreboot_msg(xpc_object_t xmsg)
 	}
 }
 
+// 过滤黑名单进程的任务查询，缓存淘汰不影响当前消息处理。
 bool roothide_handle_xpc_msg(xpc_object_t xmsg)
 {
 	audit_token_t clientToken = {0};
@@ -299,7 +314,8 @@ bool roothide_handle_xpc_msg(xpc_object_t xmsg)
 
 			volatile int clientPid = audit_token_to_pid(clientToken);
 
-			volatile char* client_identifier = [cachedJobInfo(clientPid,true)[@"identifier"] UTF8String] ?: ""; //app exit race
+			__attribute__((objc_precise_lifetime)) NSDictionary *clientJobInfo = cachedJobInfo(clientPid, true);
+			const char* client_identifier = [clientJobInfo[@"identifier"] UTF8String] ?: ""; //app exit race
 
 			volatile bool isSafeBundleIdentifier = is_safe_bundle_identifier(bundle);
 			volatile bool isSelfBundleIdentifier = client_identifier[0] && string_has_prefix(bundle, client_identifier);
@@ -317,11 +333,12 @@ bool roothide_handle_xpc_msg(xpc_object_t xmsg)
 			volatile int pid = xpc_dictionary_get_int64(xmsg, "pid");
 			volatile int clientPid = audit_token_to_pid(clientToken);
 
-			volatile char* path = [cachedJobInfo(pid,false)[@"path"] UTF8String] ?: "";
-
-			volatile char* proc_identifier = [cachedJobInfo(pid,false)[@"identifier"] UTF8String] ?: "";
-
-			volatile char* client_identifier = [cachedJobInfo(clientPid,true)[@"identifier"] UTF8String] ?: ""; //app exit race
+			// 持有字典直到本次处理结束，避免并发淘汰使 UTF8String 指针失效。
+			__attribute__((objc_precise_lifetime)) NSDictionary *processJobInfo = cachedJobInfo(pid, false);
+			__attribute__((objc_precise_lifetime)) NSDictionary *clientJobInfo = cachedJobInfo(clientPid, true);
+			const char* path = [processJobInfo[@"path"] UTF8String] ?: "";
+			const char* proc_identifier = [processJobInfo[@"identifier"] UTF8String] ?: "";
+			const char* client_identifier = [clientJobInfo[@"identifier"] UTF8String] ?: ""; //app exit race
 
 			volatile bool isJailbrokenPath = !path[0] || check_path_in_jbroot(path);
 			volatile bool isSafeBundleIdentifier = proc_identifier[0] && is_safe_bundle_identifier(proc_identifier);
