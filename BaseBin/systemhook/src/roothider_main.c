@@ -1,4 +1,5 @@
 #include <pwd.h>
+#include <errno.h>
 #include <stdio.h>
 #include <dlfcn.h>
 #include <unistd.h>
@@ -219,6 +220,7 @@ int roothide_systemhook___posix_spawn_prehook(pid_t *restrict pidp, const char *
 	return posix_spawn_hook_shared(pidp, path, desc, argv, envp, orig, trust_binary, set_process_debugged, jetsamMultiplier);
 }
 
+// 保留底层启动错误，并在完成子进程修复后恢复调用者属性。
 int roothide_systemhook___posix_spawn_posthook(pid_t *restrict pidp, const char *restrict path, struct _posix_spawn_args_desc *desc, char *const argv[restrict], char *const envp[restrict])
 {
 	posix_spawnattr_t attrp = &desc->attrp;
@@ -303,7 +305,8 @@ int roothide_systemhook___posix_spawn_posthook(pid_t *restrict pidp, const char 
 	pid_t pidval = 0;
 	if (!pidp) pidp = &pidval;
 	int ret = __posix_spawn_inline(pidp, path, desc, argv, envc);
-	pid_t pid = *pidp;
+	int savedErrno = errno;
+	pid_t pid = ret == 0 ? *pidp : -1;
 	
 	envbuf_free(envc);
 
@@ -323,6 +326,7 @@ int roothide_systemhook___posix_spawn_posthook(pid_t *restrict pidp, const char 
 		}
 	}
 
+	errno = savedErrno;
 	return ret;
 }
 
