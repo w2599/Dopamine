@@ -5,7 +5,12 @@
 #include <libjailbreak/hookd.h>
 #include <libproc.h>
 #include <sys/proc_info.h>
+#include <bsm/libbsm.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
 
+// 获取待修改任务的端口引用。
 mach_port_t extract_task_port(mach_port_t clientTaskPort, mach_port_t callerPort)
 {
 	if (callerPort == -1) {
@@ -27,6 +32,7 @@ mach_port_t extract_task_port(mach_port_t clientTaskPort, mach_port_t callerPort
 }
 
 
+// 写入 hook 并恢复代码页权限。
 int apply_hook(mach_port_t clientTaskPort, mach_port_t taskPortInClient, vm_address_t vmaddr, const void *data, vm_size_t size)
 {
 	if (!data || size == 0) return -1;
@@ -68,6 +74,7 @@ int apply_hook(mach_port_t clientTaskPort, mach_port_t taskPortInClient, vm_addr
 	return kr;
 }
 
+// 更新目标任务的内存保护。
 int apply_fixup(mach_port_t clientTaskPort, mach_port_t taskPortInClient, vm_address_t address, vm_size_t size, bool set_maximum, vm_prot_t prot)
 {
 	mach_port_t taskPort = extract_task_port(clientTaskPort, taskPortInClient);
@@ -81,184 +88,152 @@ int apply_fixup(mach_port_t clientTaskPort, mach_port_t taskPortInClient, vm_add
 	return kr;
 }
 
+// 完整检查记录边界，使用减法避免长度溢出。
+static bool hookd_validate_message(const struct hookd_mach_msg *msg, size_t *hookCountOut, size_t *fixupCountOut)
+{
+	if (msg->hdr.msgh_size < sizeof(*msg) || msg->hdr.msgh_size > HOOKD_MSG_MAX_SIZE ||
+		(msg->hdr.msgh_bits & MACH_MSGH_BITS_COMPLEX)) return false;
+	size_t dataSize = msg->hdr.msgh_size - sizeof(*msg);
+	if (msg->hooksStartOff > msg->fixupsStartOff || msg->fixupsStartOff > dataSize) return false;
+	size_t hooksSize = msg->fixupsStartOff - msg->hooksStartOff;
+	size_t fixupsSize = dataSize - msg->fixupsStartOff;
+	if (fixupsSize % sizeof(struct hookd_encoded_fixup)) return false;
+
+	size_t hookCount = 0;
+	for (size_t offset = 0; offset < hooksSize;) {
+		size_t remaining = hooksSize - offset;
+		if (remaining < sizeof(struct hookd_encoded_hook)) return false;
+		struct hookd_encoded_hook hook;
+		memcpy(&hook, &msg->data[msg->hooksStartOff + offset], sizeof(hook));
+		if (!hook.dataSize || hook.dataSize > remaining - sizeof(hook) ||
+			hook.dataSize > UINTPTR_MAX - hook.address) return false;
+		offset += sizeof(hook) + hook.dataSize;
+		hookCount++;
+	}
+	size_t fixupCount = fixupsSize / sizeof(struct hookd_encoded_fixup);
+	for (size_t i = 0; i < fixupCount; i++) {
+		const uint8_t *record = &msg->data[msg->fixupsStartOff + i * sizeof(struct hookd_encoded_fixup)];
+		if (record[offsetof(struct hookd_encoded_fixup, set_maximum)] > 1) return false;
+		struct hookd_encoded_fixup fixup;
+		memcpy(&fixup, record, sizeof(fixup));
+		if (fixup.size > UINTPTR_MAX - fixup.address) return false;
+	}
+	*hookCountOut = hookCount;
+	*fixupCountOut = fixupCount;
+	return true;
+}
+
+// 校验并一次分配回复，确保错误请求不会部分执行。
+static struct hookd_mach_msg_reply *hookd_process_message(const struct hookd_mach_msg *msg)
+{
+	size_t hookCount = 0, fixupCount = 0;
+	if (!hookd_validate_message(msg, &hookCount, &fixupCount)) return NULL;
+	size_t replySize = sizeof(struct hookd_mach_msg_reply) + (hookCount + fixupCount) * sizeof(int64_t);
+	if (replySize > HOOKD_MSG_MAX_SIZE) return NULL;
+	struct hookd_mach_msg_reply *reply = calloc(1, replySize);
+	if (!reply) return NULL;
+	task_port_t clientTaskPort = MACH_PORT_NULL;
+	kern_return_t kr = task_for_pid(mach_task_self(), msg->clientPid, &clientTaskPort);
+	if (kr != KERN_SUCCESS || !MACH_PORT_VALID(clientTaskPort)) {
+		if (MACH_PORT_VALID(clientTaskPort)) mach_port_deallocate(mach_task_self(), clientTaskPort);
+		free(reply);
+		return NULL;
+	}
+	reply->hdr.msgh_size = replySize;
+	reply->hookResultsCount = hookCount;
+	reply->fixupResultsCount = fixupCount;
+	int64_t *results = (int64_t *)reply->data;
+	size_t offset = msg->hooksStartOff;
+	for (size_t i = 0; i < hookCount; i++) {
+		struct hookd_encoded_hook hook;
+		memcpy(&hook, &msg->data[offset], sizeof(hook));
+		results[i] = apply_hook(clientTaskPort, msg->taskPortInClient, hook.address,
+			&msg->data[offset + sizeof(hook)], hook.dataSize);
+		offset += sizeof(hook) + hook.dataSize;
+	}
+	for (size_t i = 0; i < fixupCount; i++) {
+		struct hookd_encoded_fixup fixup;
+		memcpy(&fixup, &msg->data[msg->fixupsStartOff + i * sizeof(fixup)], sizeof(fixup));
+		results[hookCount + i] = apply_fixup(clientTaskPort, msg->taskPortInClient,
+			fixup.address, fixup.size, fixup.set_maximum, fixup.prot);
+	}
+	mach_port_deallocate(mach_task_self(), clientTaskPort);
+	return reply;
+}
+
+// 接收带审计信息的请求，并释放每次回复及端口权利。
 void server_loop(mach_port_t port)
 {
-	kern_return_t kr;
-	mach_msg_size_t buffer_size = 4096 + MAX_TRAILER_SIZE;
-	void *buffer = malloc(buffer_size);
-
+	union {
+		uint64_t alignment;
+		uint8_t bytes[HOOKD_MSG_MAX_SIZE + MAX_TRAILER_SIZE];
+	} buffer;
 	while (true) {
-		struct hookd_mach_msg *msg = (struct hookd_mach_msg *)buffer;
-		task_port_t clientTaskPort = MACH_PORT_NULL;
-
-		kr = mach_msg(
-			(mach_msg_header_t *)msg,
-			MACH_RCV_MSG |
+		struct hookd_mach_msg *msg = (struct hookd_mach_msg *)buffer.bytes;
+		kern_return_t kr = mach_msg(&msg->hdr, MACH_RCV_MSG |
 			MACH_RCV_TRAILER_TYPE(MACH_MSG_TRAILER_FORMAT_0) |
 			MACH_RCV_TRAILER_ELEMENTS(MACH_RCV_TRAILER_AUDIT),
-			0,
-			buffer_size,
-			port,
-			MACH_MSG_TIMEOUT_NONE,
-			MACH_PORT_NULL
-		);
-
-		if (kr != KERN_SUCCESS) {
-			continue;
-		}
-
-		// printf("Hookd received msg: ");
-		// __builtin_dump_struct(msg, printf);
-
-		if (msg->hdr.msgh_size < sizeof(struct hookd_mach_msg)) goto deny;
-
-		mach_msg_trailer_t *trailer = (mach_msg_trailer_t *)((uint8_t *)msg + msg->hdr.msgh_size);
-		if (trailer->msgh_trailer_type != MACH_MSG_TRAILER_FORMAT_0 || 
-			trailer->msgh_trailer_size < sizeof(mach_msg_audit_trailer_t)) goto deny;
-
-		mach_msg_audit_trailer_t *auditTrailer = (mach_msg_audit_trailer_t *)trailer;
-		pid_t callerPid = audit_token_to_pid(auditTrailer->msgh_audit);
-
+			0, sizeof(buffer), port, MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL);
+		if (kr != KERN_SUCCESS) continue;
+		if (msg->hdr.msgh_size < sizeof(*msg) || msg->hdr.msgh_size > HOOKD_MSG_MAX_SIZE ||
+			(msg->hdr.msgh_bits & MACH_MSGH_BITS_COMPLEX)) goto deny;
+		if (!MACH_PORT_VALID(msg->hdr.msgh_remote_port)) goto deny;
+		size_t trailerOffset = round_msg(msg->hdr.msgh_size);
+		if (sizeof(mach_msg_audit_trailer_t) > sizeof(buffer) - trailerOffset) goto deny;
+		mach_msg_audit_trailer_t *trailer = (void *)(buffer.bytes + trailerOffset);
+		if (trailer->msgh_trailer_type != MACH_MSG_TRAILER_FORMAT_0 ||
+			trailer->msgh_trailer_size < sizeof(*trailer) ||
+			trailer->msgh_trailer_size > sizeof(buffer) - trailerOffset) goto deny;
 #if !HOOKD_SKIP_CALLER_VERIFICATION
-		if (callerPid != 1) goto deny;
+		if (audit_token_to_pid(trailer->msgh_audit) != 1) goto deny;
 #endif
-
-		size_t dataSize = msg->hdr.msgh_size - offsetof(struct hookd_mach_msg, data);
-		
-		if (msg->hooksStartOff > dataSize) goto deny;
-		if (msg->fixupsStartOff > dataSize) goto deny;
-		if (msg->hooksStartOff > msg->fixupsStartOff) goto deny;
-
-		kr = task_for_pid(mach_task_self(), msg->clientPid, &clientTaskPort);
-		if (kr != KERN_SUCCESS || !MACH_PORT_VALID(clientTaskPort)) {
-			// printf("task_for_pid(%d) failed (%d)\n", msg->clientPid, kr);
-			goto deny;
-		}
-
-		size_t hooksSize = msg->fixupsStartOff - msg->hooksStartOff;
-		size_t fixupsSize = dataSize - msg->fixupsStartOff;
-
-		uint8_t *hooksStart  = &msg->data[msg->hooksStartOff];
-		uint8_t *fixupsStart = &msg->data[msg->fixupsStartOff];
-
-		// Apply hooks
-		int64_t *hookResults = NULL;
-		uint32_t hookCount = 0;
-		if (hooksSize > 0) {
-			for (uint32_t idx = 0; idx < hooksSize;) {
-				struct hookd_encoded_hook *hook = (struct hookd_encoded_hook *)&hooksStart[idx];
-				uint32_t remainingBytes = hooksSize - idx;
-				uint32_t hookSize = sizeof(*hook) + hook->dataSize;
-				if (hookSize > remainingBytes) break;
-
-				hookCount++;
-				hookResults = realloc(hookResults, sizeof(int64_t) * hookCount);
-				hookResults[hookCount-1] = apply_hook(clientTaskPort, msg->taskPortInClient, hook->address, hook->data, hook->dataSize);
-				// printf("Hook %d (address=%#llx, data=%p, dataSize=%zu) => %lld\n", hookCount-1, hook->address, hook->data, hook->dataSize, hookResults[hookCount-1]);
-				idx += hookSize;
-			}
-		}
-
-		// Apply fixups
-		int64_t *fixupResults = NULL;
-		uint32_t fixupCount = 0;
-		if ((fixupsSize > 0) && ((fixupsSize % sizeof(struct hookd_encoded_fixup)) == 0)) {
-			fixupCount = fixupsSize / sizeof(struct hookd_encoded_fixup);
-			fixupResults = malloc(fixupCount * sizeof(int64_t));
-
-			for (uint32_t idx = 0; idx < fixupCount; idx++) {
-				struct hookd_encoded_fixup *fixup = (struct hookd_encoded_fixup *)&fixupsStart[idx * sizeof(struct hookd_encoded_fixup)];
-				fixupResults[idx] = apply_fixup(clientTaskPort, msg->taskPortInClient, fixup->address, fixup->size, fixup->set_maximum, fixup->prot);
-				// printf("Fixup %d => %lld\n", idx, fixupResults[idx]);
-			}
-		}
-
-		size_t hookResultsSize  = hookCount * sizeof(int64_t);
-		size_t fixupResultsSize = fixupCount * sizeof(int64_t);
-
-		size_t replySize = sizeof(struct hookd_mach_msg_reply) + hookResultsSize + fixupResultsSize;
-		struct hookd_mach_msg_reply *reply = malloc(replySize);
-		reply->hdr.msgh_size = replySize;
-		
-		reply->hookResultsCount  = hookCount;
-		reply->fixupResultsCount = fixupCount;
-
-		if (hookResults)  { memcpy(&reply->data[0],               hookResults,  hookResultsSize);  free(hookResults); }
-		if (fixupResults) { memcpy(&reply->data[hookResultsSize], fixupResults, fixupResultsSize); free(fixupResults); }
-
-		int32_t bits = MACH_MSGH_BITS_REMOTE(msg->hdr.msgh_bits);
-		if (bits == MACH_MSG_TYPE_COPY_SEND) {
-			bits = MACH_MSG_TYPE_MOVE_SEND;
-		}
-		reply->hdr.msgh_bits = MACH_MSGH_BITS(bits, 0);
-		reply->hdr.msgh_remote_port  = msg->hdr.msgh_remote_port;
-		reply->hdr.msgh_local_port   = 0;
-		reply->hdr.msgh_voucher_port = 0;
-		reply->hdr.msgh_id           = msg->hdr.msgh_id + 100;
-
-		// printf("Hookd sending reply: ");
-		// __builtin_dump_struct(reply, printf);
-
-		if (mach_msg_send(&reply->hdr) == KERN_SUCCESS) {
-			msg->hdr.msgh_remote_port = 0;
-			msg->hdr.msgh_bits = msg->hdr.msgh_bits & ~MACH_MSGH_BITS_REMOTE_MASK;
-		}
+		struct hookd_mach_msg_reply *reply = hookd_process_message(msg);
+		if (!reply) goto deny;
+		mach_msg_type_name_t disposition = MACH_MSGH_BITS_REMOTE(msg->hdr.msgh_bits);
+		if (disposition == MACH_MSG_TYPE_COPY_SEND) disposition = MACH_MSG_TYPE_MOVE_SEND;
+		reply->hdr.msgh_bits = MACH_MSGH_BITS(disposition, 0);
+		reply->hdr.msgh_remote_port = msg->hdr.msgh_remote_port;
+		reply->hdr.msgh_id = msg->hdr.msgh_id + 100;
+		// 回复接管端口，发送失败也只释放一次。
+		msg->hdr.msgh_remote_port = MACH_PORT_NULL;
+		msg->hdr.msgh_bits &= ~MACH_MSGH_BITS_REMOTE_MASK;
+		kr = mach_msg(&reply->hdr, MACH_SEND_MSG | MACH_SEND_TIMEOUT,
+			reply->hdr.msgh_size, 0, MACH_PORT_NULL, 1000, MACH_PORT_NULL);
+		if (kr != KERN_SUCCESS) mach_msg_destroy(&reply->hdr);
+		free(reply);
 
 deny:
-		if (MACH_PORT_VALID(clientTaskPort)) {
-			mach_port_mod_refs(mach_task_self(), clientTaskPort, MACH_PORT_RIGHT_SEND, -1);
-		}
 		mach_msg_destroy(&msg->hdr);
-		fflush(stdout);
-		continue;
 	}
 }
 
+// 注册服务端口并向启动方发送带发送权的 checkin。
 int main(int argc, char **argv)
 {
-	//freopen("/private/preboot/hookd.log", "a+", stdout); 
-
-	// printf("hookd: we out here\n"); fflush(stdout);
-
-	// Create server port
 	mach_port_t serverPort = MACH_PORT_NULL;
-	mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &serverPort);
-	mach_port_insert_right(mach_task_self(), serverPort, serverPort, MACH_MSG_TYPE_MAKE_SEND);
-
-	// Send server port to parent
-	mach_port_t *registeredPorts;
+	kern_return_t kr = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &serverPort);
+	if (kr != KERN_SUCCESS) return kr;
+	mach_port_t *registeredPorts = NULL;
 	mach_msg_type_number_t registeredPortsCount = 0;
-	kern_return_t kr = mach_ports_lookup(mach_task_self(), &registeredPorts, &registeredPortsCount);
-	if (kr != KERN_SUCCESS) {
-		// printf("hookd failed to lookup registered ports\n"); fflush(stdout);
-		return -1;
+	kr = mach_ports_lookup(mach_task_self(), &registeredPorts, &registeredPortsCount);
+	if (kr == KERN_SUCCESS && (registeredPortsCount < 3 || !MACH_PORT_VALID(registeredPorts[2]))) kr = KERN_INVALID_ARGUMENT;
+	if (kr == KERN_SUCCESS) {
+		mach_msg_header_t hdr = { 0 };
+		hdr.msgh_size = sizeof(hdr);
+		hdr.msgh_bits = MACH_MSGH_BITS(MACH_MSG_TYPE_COPY_SEND, MACH_MSG_TYPE_MAKE_SEND);
+		hdr.msgh_remote_port = registeredPorts[2];
+		hdr.msgh_local_port = serverPort;
+		hdr.msgh_id = 0x40000000;
+		kr = mach_msg(&hdr, MACH_SEND_MSG | MACH_SEND_TIMEOUT, hdr.msgh_size, 0,
+			MACH_PORT_NULL, 5000, MACH_PORT_NULL);
 	}
-
-	mach_port_t checkinPort = registeredPorts[2];
-	if (checkinPort == MACH_PORT_NULL) {
-		// printf("checkinPort is NULL, not launched from launchd\n"); fflush(stdout);
-		return -1;
+	if (registeredPorts) {
+		for (mach_msg_type_number_t i = 0; i < registeredPortsCount; i++) {
+			if (MACH_PORT_VALID(registeredPorts[i])) mach_port_deallocate(mach_task_self(), registeredPorts[i]);
+		}
+		vm_deallocate(mach_task_self(), (vm_address_t)registeredPorts, sizeof(mach_port_t) * registeredPortsCount);
 	}
-
-	mach_msg_header_t hdr = {};
-	hdr.msgh_size         = sizeof(hdr);
-	hdr.msgh_bits        |= MACH_MSGH_BITS(MACH_MSG_TYPE_COPY_SEND, MACH_MSG_TYPE_MAKE_SEND);
-	hdr.msgh_remote_port  = checkinPort;
-	hdr.msgh_local_port   = serverPort;
-	hdr.msgh_voucher_port = 0;
-	hdr.msgh_id           = 0x40000000;
-
-	kr = mach_msg(&hdr, MACH_SEND_MSG, hdr.msgh_size, 0, 0, 0, 0);
-	if (kr != KERN_SUCCESS) {
-		// printf("hookd failed to send checkin to parent\n"); fflush(stdout);
-		return kr;
-	}
-
-	vm_deallocate(mach_task_self(), (vm_address_t)registeredPorts, sizeof(mach_port_t) * registeredPortsCount);
-
-	// Start server
-	// printf("hookd: Starting server...\n"); fflush(stdout);
-	server_loop(serverPort);
-
-	return 0;
+	if (kr == KERN_SUCCESS) server_loop(serverPort);
+	mach_port_destroy(mach_task_self(), serverPort);
+	return kr;
 }

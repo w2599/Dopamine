@@ -30,9 +30,12 @@ typedef struct s_jbserver_arg
 	bool out;
 } jbserver_arg;
 
+// 每个 action 最多传递八个参数槽，DATA 占用两个槽。
+#define JBSERVER_MAX_ARGS 8
+
 struct jbserver_action {
 	void *handler;
-	jbserver_arg *args;
+	jbserver_arg args[JBSERVER_MAX_ARGS];
 };
 
 struct jbserver_domain {

@@ -1,5 +1,7 @@
 #include <libroothider/libroothider.h>
 #include <libjailbreak/jbserver.h>
+#include <libjailbreak/jbclient_mach.h>
+#include <errno.h>
 #include <mach/mach.h>
 #include <bsm/audit.h>
 #include <libproc.h>
@@ -126,12 +128,13 @@ int jbserver_received_mach_message(audit_token_t *auditToken, struct jbserver_ma
 		r = 0;
 	}
 	else if (jbsMachMsg->action == JBSERVER_MACH_HOOKD_SEND_MSG) {
-		if (msgSize < sizeof(struct jbserver_mach_msg_hookd_send_msg)) return -1;
+		if (msgSize < sizeof(struct jbserver_mach_msg_hookd_send_msg) + sizeof(struct hookd_mach_msg)) return -1;
 		if (msgSize > (sizeof(struct jbserver_mach_msg_hookd_send_msg) + HOOKD_MSG_MAX_SIZE)) return -1;
 		
 		struct jbserver_mach_msg_hookd_send_msg *hookdMsgToRedirect = (struct jbserver_mach_msg_hookd_send_msg *)jbsMachMsg;
 		struct hookd_mach_msg *hookdMsg = (struct hookd_mach_msg *)&hookdMsgToRedirect->hookdMsg[0];
-		if ((hookdMsg->hdr.msgh_size + offsetof(struct jbserver_mach_msg_hookd_send_msg, hookdMsg)) > msgSize) return -1;
+		if (hookdMsg->hdr.msgh_size < sizeof(*hookdMsg) ||
+			hookdMsg->hdr.msgh_size > msgSize - offsetof(struct jbserver_mach_msg_hookd_send_msg, hookdMsg)) return -1;
 
 		size_t hookdMsgSize = hookdMsg->hdr.msgh_size;
 		
@@ -148,13 +151,18 @@ int jbserver_received_mach_message(audit_token_t *auditToken, struct jbserver_ma
 		struct hookd_mach_msg_reply *hookdReply = (struct hookd_mach_msg_reply *)hookdReplyBuf;
 		hookdReply->hdr.msgh_size = hookdReplySize;
 
-		int result = hookd_send_msg(hookdMsg, hookdReply);
+		int result = ENOTSUP;
+		// 未安装 launchd provider 时不得转发回自身。
+		if (hookd_send_msg && hookd_send_msg != jbclient_mach_hookd_send_msg) result = hookd_send_msg(hookdMsg, hookdReply);
+		if (result == 0 && (hookdReply->hdr.msgh_size < sizeof(*hookdReply) ||
+			hookdReply->hdr.msgh_size > HOOKD_MSG_MAX_SIZE)) result = EPROTO;
 
 		size_t replySize = sizeof(struct jbserver_mach_msg_hookd_send_msg_reply);
 		if (result == 0) {
 			replySize += hookdReply->hdr.msgh_size;
 		}
 		replyData = malloc(replySize);
+		if (!replyData) return -1;
 		memset(replyData, 0, replySize);
 		struct jbserver_mach_msg_hookd_send_msg_reply *reply = (struct jbserver_mach_msg_hookd_send_msg_reply *)replyData;
 		if (result == 0) {
