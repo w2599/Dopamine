@@ -54,15 +54,18 @@ bool string_has_suffix(const char* str, const char* suffix)
 	return !strcmp(str + str_len - suffix_len, suffix);
 }
 
+// 独立保存分段状态，允许回调重入并保留调用方的 strtok 状态。
 void string_enumerate_components(const char *string, const char *separator, void (^enumBlock)(const char *pathString, bool *stop))
 {
 	char *stringCopy = strdup(string);
-	char *curString = strtok(stringCopy, separator);
+	if (!stringCopy) return;
+	char *state = NULL;
+	char *curString = strtok_r(stringCopy, separator, &state);
 	while (curString != NULL) {
 		bool stop = false;
 		enumBlock(curString, &stop);
 		if (stop) break;
-		curString = strtok(NULL, separator);
+		curString = strtok_r(NULL, separator, &state);
 	}
 	free(stringCopy);
 }
@@ -147,6 +150,9 @@ static int spawn_exec_hook_common(bool isExec,
 	int personaFixGid = -1;
 	struct _posix_spawn_persona_info *modifiedPersona = NULL;
 	short personaOriginalFlags = 0;
+	bool modifiedMemlimits = false;
+	int originalActiveLimit = 0;
+	int originalInactiveLimit = 0;
 	posix_spawnattr_t attr = NULL;
 	if (desc) attr = desc->attrp;
 
@@ -223,10 +229,13 @@ static int spawn_exec_hook_common(bool isExec,
                 double configuredAddend = zqbb_getJetsamAddend(path) + round(jetsamMultiplier * 10);
                 int jetsamAddend = configuredAddend >= INT_MAX ? INT_MAX : (int)configuredAddend;
 				int memlimit_active = *(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_ACTIVE);
+				int memlimit_inactive = *(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_INACTIVE);
+				originalActiveLimit = memlimit_active;
+				originalInactiveLimit = memlimit_inactive;
+				modifiedMemlimits = true;
 				if (memlimit_active != -1) {
 					*(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_ACTIVE) = (int)min((int64_t)INT_MAX, (int64_t)memlimit_active + jetsamAddend);
 				}
-				int memlimit_inactive = *(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_INACTIVE);
 				if (memlimit_inactive != -1) {
 					*(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_INACTIVE) = (int)min((int64_t)INT_MAX, (int64_t)memlimit_inactive + jetsamAddend);
 				}
@@ -340,7 +349,11 @@ static int spawn_exec_hook_common(bool isExec,
 		envbuf_free(envc);
 	}
 
-	// 无论启动是否成功，都还原调用者的 persona 和临时挂起标志。
+	// 无论启动是否成功，都还原调用者的额度、persona 和临时挂起标志。
+	if (modifiedMemlimits) {
+		*(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_ACTIVE) = originalActiveLimit;
+		*(int*)(attrStruct + POSIX_SPAWNATTR_OFF_MEMLIMIT_INACTIVE) = originalInactiveLimit;
+	}
 	if (modifiedPersona) {
 		if (personaFixUid == 0) modifiedPersona->pspi_uid = personaFixUid;
 		if (personaFixGid == 0) modifiedPersona->pspi_gid = personaFixGid;

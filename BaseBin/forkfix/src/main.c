@@ -1,6 +1,9 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <sys/wait.h>
 #include <signal.h>
@@ -13,67 +16,109 @@
 
 extern void __fork(void);
 
-int childToParentPipe[2];
-int parentToChildPipe[2];
-static void open_pipes(void)
+struct fork_pipes {
+	int childToParent[2];
+	int parentToChild[2];
+};
+
+// 关闭已持有的端点，避免失败清理跳过后续描述符。
+static void close_pipe_end(int *fd)
 {
-	if (pipe(parentToChildPipe) < 0 || pipe(childToParentPipe) < 0) {
-		abort();
-	}
-}
-static void close_pipes(void)
-{
-	if (ffsys_close(parentToChildPipe[0]) != 0 || ffsys_close(parentToChildPipe[1]) != 0 || ffsys_close(childToParentPipe[0]) != 0 || ffsys_close(childToParentPipe[1]) != 0) {
-		abort();
+	if (*fd >= 0) {
+		ffsys_close(*fd);
+		*fd = -1;
 	}
 }
 
-void child_fixup(void)
+// 释放本次 fork 的全部管道，不依赖可被其他线程改写的全局状态。
+static void close_pipes(struct fork_pipes *pipes)
 {
-	// Tell parent we are waiting for fixup now
+	close_pipe_end(&pipes->parentToChild[0]);
+	close_pipe_end(&pipes->parentToChild[1]);
+	close_pipe_end(&pipes->childToParent[0]);
+	close_pipe_end(&pipes->childToParent[1]);
+}
+
+// 建立握手管道，让断开的写端返回 EPIPE 而不是终止父进程。
+static int open_pipes(struct fork_pipes *pipes)
+{
+	if (pipe(pipes->parentToChild) < 0 || pipe(pipes->childToParent) < 0
+		|| fcntl(pipes->parentToChild[1], F_SETNOSIGPIPE, 1) < 0
+		|| fcntl(pipes->childToParent[1], F_SETNOSIGPIPE, 1) < 0) {
+		int error = errno;
+		close_pipes(pipes);
+		return error;
+	}
+	return 0;
+}
+
+// 原始读写以负 errno 报错；信号中断需重试，EOF 不能当作放行。
+static int handshake_byte(int fd, bool writing)
+{
 	char msg = ' ';
-	ffsys_write(childToParentPipe[1], &msg, sizeof(msg));
-
-	// Wait until parent completes fixup
-	ffsys_read(parentToChildPipe[0], &msg, sizeof(msg));
+	ssize_t transferred;
+	do {
+		transferred = writing ? ffsys_write(fd, &msg, 1) : ffsys_read(fd, &msg, 1);
+	} while (transferred == -EINTR);
+	if (transferred == 1) return 0;
+	if (transferred < 0) return (int)-transferred;
+	return transferred == 0 ? EPIPE : EIO;
 }
 
-void parent_fixup(pid_t childPid)
+// 子进程必须收到修复完成的字节，才能返回调用方。
+static int child_fixup(struct fork_pipes *pipes)
 {
-	// Wait until the child is ready and waiting
-	char msg = ' ';
-	read(childToParentPipe[0], &msg, sizeof(msg));
-
-	// Child is waiting for wx_allowed + permission fixups now
-	// Apply fixup
-	int64_t fix_ret = jbclient_mach_fork_fix(childPid);
-	if (fix_ret != 0) {
-		kill(childPid, SIGKILL);
-		abort();
-	}
-
-	// Tell child we are done, this will make it resume
-	write(parentToChildPipe[1], &msg, sizeof(msg));
+	int error = handshake_byte(pipes->childToParent[1], true);
+	if (error) return error;
+	return handshake_byte(pipes->parentToChild[0], false);
 }
 
+// 等待子进程就绪，完成权限修复后才发送放行字节。
+static int parent_fixup(struct fork_pipes *pipes, pid_t childPid)
+{
+	int error = handshake_byte(pipes->childToParent[0], false);
+	if (error) return error;
+	if (jbclient_mach_fork_fix(childPid) != 0) return EIO;
+	return handshake_byte(pipes->parentToChild[1], true);
+}
+
+// 握手失败时终止并回收子进程，不让未修复的子进程继续执行。
 __attribute__((visibility ("default"))) pid_t forkfix___fork(void)
 {
-	open_pipes();
+	struct fork_pipes pipes = {{-1, -1}, {-1, -1}};
+	int error = open_pipes(&pipes);
+	if (error) {
+		errno = error;
+		return -1;
+	}
 
 	pid_t pid = ffsys_fork();
 	if (pid < 0) {
-		close_pipes();
+		error = errno;
+		close_pipes(&pipes);
+		errno = error;
 		return pid;
 	}
 
 	if (pid == 0) {
-		child_fixup();
+		close_pipe_end(&pipes.childToParent[0]);
+		close_pipe_end(&pipes.parentToChild[1]);
+		if (child_fixup(&pipes) != 0) ffsys_exit(127);
 	}
 	else {
-		parent_fixup(pid);
+		close_pipe_end(&pipes.childToParent[1]);
+		close_pipe_end(&pipes.parentToChild[0]);
+		error = parent_fixup(&pipes, pid);
+		if (error) {
+			kill(pid, SIGKILL);
+			close_pipes(&pipes);
+			while (waitpid(pid, NULL, 0) < 0 && errno == EINTR) {}
+			errno = error;
+			return -1;
+		}
 	}
 
-	close_pipes();
+	close_pipes(&pipes);
 	return pid;
 }
 
