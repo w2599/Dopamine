@@ -41,9 +41,7 @@
     self.buttonsView.axis = UILayoutConstraintAxisVertical;
     self.buttonsView.translatesAutoresizingMaskIntoConstraints = NO;
 
-    int button_height = [DOGlobalAppearance isHomeButtonDevice] ? UI_ACTION_HEIGHT_HOME_BTN : UI_ACTION_HEIGHT;
-    if ([DOGlobalAppearance isSmallDevice])
-        button_height = UI_ACTION_HEIGHT_TINY;
+    int button_height = UI_ACTION_HEIGHT;
 
     [self.actions enumerateObjectsUsingBlock:^(UIAction *action, NSUInteger idx, BOOL *stop) {
         DOActionMenuButton *button = [DOActionMenuButton buttonWithAction:action chevron:[self.delegate actionMenuShowsChevronForAction:action]];
@@ -58,7 +56,7 @@
 
     [self addSubview:self.buttonsView];
 
-    int inner_padding = [DOGlobalAppearance isSmallDevice] ? UI_INNER_PADDING_TINY : UI_INNER_PADDING;
+    int inner_padding = UI_INNER_PADDING;
 
     [NSLayoutConstraint activateConstraints:@[
         [self.buttonsView.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:inner_padding],
