@@ -43,7 +43,7 @@ struct jbserver_domain gPlatformDomain = {
 		// JBS_PLATFORM_SET_PROCESS_DEBUGGED
 		{
 			.handler = platform_set_process_debugged,
-			.args = (jbserver_arg[]){
+			.args = {
 				{ .name = "pid", .type = JBS_TYPE_UINT64, .out = false },
 				{ .name = "fully-debugged", .type = JBS_TYPE_BOOL, .out = false },
 				{ 0 },
@@ -52,7 +52,7 @@ struct jbserver_domain gPlatformDomain = {
 		// JBS_PLATFORM_STAGE_JAILBREAK_UPDATE
 		{
 			.handler = platform_stage_jailbreak_update,
-			.args = (jbserver_arg[]){
+			.args = {
 				{ .name = "update-tar", .type = JBS_TYPE_STRING, .out = false },
 				{ 0 },
 			},
@@ -60,7 +60,7 @@ struct jbserver_domain gPlatformDomain = {
 		// JBS_PLATFORM_JBSETTINGS_SET
 		{
 			.handler = jbsettings_set,
-			.args = (jbserver_arg[]){
+			.args = {
 				{ .name = "key", .type = JBS_TYPE_STRING, .out = false },
 				{ .name = "value", .type = JBS_TYPE_XPC_GENERIC, .out = false },
 				{ 0 },
@@ -69,7 +69,7 @@ struct jbserver_domain gPlatformDomain = {
 		// JBS_PLATFORM_SET_SYSTEMWIDE_DOMAIN_ENABLED
 		{
 			.handler = roothide_unsupport_request,
-			.args = (jbserver_arg[]){
+			.args = {
 				{ .name = "enabled", .type = JBS_TYPE_BOOL, .out = false },
 				{ 0 },
 			},

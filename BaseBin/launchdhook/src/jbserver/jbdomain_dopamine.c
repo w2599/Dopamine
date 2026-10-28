@@ -112,7 +112,7 @@ struct jbserver_domain gDopamineDomain = {
 		// JBS_DOPAMINE_IS_JAILBROKEN
 		{
 			.handler = dopamine_is_jailbroken,
-			.args = (jbserver_arg[]){
+			.args = {
 				{ .name = "version", .type = JBS_TYPE_STRING, .out = true },
 				{ 0 },
 			},
@@ -120,7 +120,7 @@ struct jbserver_domain gDopamineDomain = {
 		// JBS_DOPAMINE_GET_ROOT
 		{
 			.handler = dopamine_get_root,
-			.args = (jbserver_arg[]){
+			.args = {
 				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
 				{ 0 },
 			},
@@ -128,7 +128,7 @@ struct jbserver_domain gDopamineDomain = {
 		// JBS_DOPAMINE_DROP_ROOT
 		{
 			.handler = dopamine_drop_root,
-			.args = (jbserver_arg[]){
+			.args = {
 				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
 				{ 0 },
 			},

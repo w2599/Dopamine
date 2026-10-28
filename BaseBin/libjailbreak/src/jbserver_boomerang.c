@@ -67,7 +67,7 @@ struct jbserver_domain gBoomerangDomain = {
 		// JBS_ROOT_GET_PHYSRW
 		{
 			.handler = boomerang_get_physrw,
-			.args = (jbserver_arg[]){
+			.args = {
 				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
 				{ .name = "single-pte", .type = JBS_TYPE_BOOL, .out = false },
 				{ .name = "single-pte-asid-ptr", .type = JBS_TYPE_UINT64, .out = true },
@@ -77,7 +77,7 @@ struct jbserver_domain gBoomerangDomain = {
 		// JBS_ROOT_SIGN_THREAD
 		{
 			.handler = boomerang_sign_thread,
-			.args = (jbserver_arg[]){
+			.args = {
 				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
 				{ .name = "thread-port", .type = JBS_TYPE_UINT64, .out = false },
 				{ 0 },
@@ -86,7 +86,7 @@ struct jbserver_domain gBoomerangDomain = {
 		// JBS_ROOT_GET_SYSINFO
 		{
 			.handler = boomerang_get_sysinfo,
-			.args = (jbserver_arg[]){
+			.args = {
 				{ .name = "sysinfo", .type = JBS_TYPE_DICTIONARY, .out = true },
 				{ 0 },
 			},

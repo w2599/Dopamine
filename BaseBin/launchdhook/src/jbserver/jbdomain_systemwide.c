@@ -630,7 +630,7 @@ struct jbserver_domain gSystemwideDomain = {
 		// JBS_SYSTEMWIDE_GET_JBROOT
 		{
 			.handler = systemwide_get_jbroot,
-			.args = (jbserver_arg[]){
+			.args = {
 				{ .name = "root-path", .type = JBS_TYPE_STRING, .out = true },
 				{ 0 },
 			},
@@ -638,7 +638,7 @@ struct jbserver_domain gSystemwideDomain = {
 		// JBS_SYSTEMWIDE_GET_BOOT_UUID
 		{
 			.handler = systemwide_get_boot_uuid,
-			.args = (jbserver_arg[]){
+			.args = {
 				{ .name = "boot-uuid", .type = JBS_TYPE_STRING, .out = true },
 				{ 0 },
 			},
@@ -646,7 +646,7 @@ struct jbserver_domain gSystemwideDomain = {
 		// JBS_SYSTEMWIDE_TRUST_FILE
 		{
 			.handler = systemwide_trust_file,
-			.args = (jbserver_arg[]){
+			.args = {
 				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
 				{ .name = "fd", .type = JBS_TYPE_UINT64, .out = false },
 				{ .name = "siginfo", .type = JBS_TYPE_DATA, .out = false },
@@ -657,7 +657,7 @@ struct jbserver_domain gSystemwideDomain = {
 		// JBS_SYSTEMWIDE_PROCESS_CHECKIN
 		{
 			.handler = systemwide_process_checkin,
-			.args = (jbserver_arg[]) {
+			.args = {
 				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
 				{ .name = "root-path", .type = JBS_TYPE_STRING, .out = true },
 				{ .name = "boot-uuid", .type = JBS_TYPE_STRING, .out = true },
@@ -670,7 +670,7 @@ struct jbserver_domain gSystemwideDomain = {
 		// JBS_SYSTEMWIDE_FORK_FIX
 		{
 			.handler = systemwide_fork_fix,
-			.args = (jbserver_arg[]) {
+			.args = {
 				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
 				{ .name = "child-pid", .type = JBS_TYPE_UINT64, .out = false },
 				{ 0 },
@@ -679,7 +679,7 @@ struct jbserver_domain gSystemwideDomain = {
 		// JBS_SYSTEMWIDE_CS_REVALIDATE
 		{
 			.handler = systemwide_cs_revalidate,
-			.args = (jbserver_arg[]) {
+			.args = {
 				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
 				{ 0 },
 			},
@@ -687,19 +687,21 @@ struct jbserver_domain gSystemwideDomain = {
 		// JBS_SYSTEMWIDE_JBSETTINGS_GET
 		{
 			.handler = jbsettings_get,
-			.args = (jbserver_arg[]) {
+			.args = {
 				{ .name = "key", .type = JBS_TYPE_STRING, .out = false },
 				{ .name = "value", .type = JBS_TYPE_XPC_GENERIC, .out = true },
+				{ 0 },
 			},
 		},
 		// JBS_SYSTEMWIDE_PERSONA_FIX
 		{
 			.handler = systemwide_persona_fix,
-			.args = (jbserver_arg[]) {
+			.args = {
 				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
 				{ .name = "child-pid", .type = JBS_TYPE_UINT64, .out = false },
 				{ .name = "overwrite-uid", .type = JBS_TYPE_UINT64, .out = false },
 				{ .name = "overwrite-gid", .type = JBS_TYPE_UINT64, .out = false },
+				{ 0 },
 			},
 		},
 		{ 0 },

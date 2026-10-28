@@ -56,7 +56,7 @@ struct jbserver_domain gWatchdogDomain = {
 		// JBS_WATCHDOG_INTERCEPT_USERSPACE_PANIC
 		{
 			.handler = watchdog_intercept_userspace_panic,
-			.args = (jbserver_arg[]){
+			.args = {
 				{ .name = "panic-message", .type = JBS_TYPE_STRING, .out = false },
 				{ 0 },
 			},
@@ -64,7 +64,7 @@ struct jbserver_domain gWatchdogDomain = {
 		// JBS_WATCHDOG_GET_LAST_USERSPACE_PANIC
 		{
 			.handler = watchdog_get_last_userspace_panic,
-			.args = (jbserver_arg[]){
+			.args = {
 				{ .name = "panic-message", .type = JBS_TYPE_STRING, .out = true },
 				{ 0 },
 			},
