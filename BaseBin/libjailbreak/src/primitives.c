@@ -191,6 +191,7 @@ int proc_vreadbuf(uint64_t proc, const void *addr, void *outdata, size_t datalen
 	return vreadbuf(ttep, addr, outdata, datalen);
 }
 
+// 将进程虚拟地址转换到页表后执行写入。
 int proc_vwritebuf(uint64_t proc, const void *addr, const void *indata, size_t datalen)
 {
 	uint64_t task = proc_task(proc);
@@ -201,7 +202,7 @@ int proc_vwritebuf(uint64_t proc, const void *addr, const void *indata, size_t d
 	if (!pmap) return -1;
 	uint64_t ttep = kread64(pmap + koffsetof(pmap, ttep));
 	if (!ttep) return -1;
-	return proc_vwritebuf(ttep, addr, indata, datalen);
+	return vwritebuf(ttep, addr, indata, datalen);
 }
 
 // Convenience Wrappers
