@@ -1190,40 +1190,36 @@ uint64_t vm_page_for_pa(uint64_t pa)
 	return vm_page_for_pnum(atop(pa));
 }
 
+// 按参数容量读取进程路径，避免进程列表长度与参数长度混用。
 void killall(const char *executablePath, int signal)
 {
-	static int maxArgumentSize = 0;
-	if (maxArgumentSize == 0) {
-		size_t size = sizeof(maxArgumentSize);
-		if (sysctl((int[]){ CTL_KERN, KERN_ARGMAX }, 2, &maxArgumentSize, &size, NULL, 0) == -1) {
-			perror("sysctl argument size");
-			maxArgumentSize = 4096; // Default
-		}
+	if (!executablePath) return;
+	int maxArgumentSize = 0;
+	size_t argumentSizeLength = sizeof(maxArgumentSize);
+	if (sysctl((int[]){ CTL_KERN, KERN_ARGMAX }, 2, &maxArgumentSize, &argumentSizeLength, NULL, 0) != 0 || maxArgumentSize <= 0) {
+		maxArgumentSize = 4096;
 	}
-	int mib[3] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL};
-	struct kinfo_proc *info;
-	size_t length;
-	int count;
-	
-	if (sysctl(mib, 3, NULL, &length, NULL, 0) < 0)
-		return;
-	if (!(info = malloc(length)))
-		return;
+
+	int mib[3] = { CTL_KERN, KERN_PROC, KERN_PROC_ALL };
+	size_t length = 0;
+	if (sysctl(mib, 3, NULL, &length, NULL, 0) < 0 || length == 0) return;
+	struct kinfo_proc *info = malloc(length);
+	if (!info) return;
 	if (sysctl(mib, 3, info, &length, NULL, 0) < 0) {
 		free(info);
 		return;
 	}
-	count = length / sizeof(struct kinfo_proc);
-	for (int i = 0; i < count; i++) {
-		pid_t pid = info[i].kp_proc.p_pid;
-		if (pid == 0) {
-			continue;
-		}
-		size_t size = maxArgumentSize;
-		char* buffer = (char *)malloc(length);
-		if (sysctl((int[]){ CTL_KERN, KERN_PROCARGS2, pid }, 3, buffer, &size, NULL, 0) == 0) {
-			char *cExecutablePath = buffer + sizeof(int);
-			if (strcmp(cExecutablePath, executablePath) == 0) {
+
+	char *buffer = malloc((size_t)maxArgumentSize);
+	if (buffer) {
+		for (size_t i = 0; i < length / sizeof(*info); i++) {
+			pid_t pid = info[i].kp_proc.p_pid;
+			if (pid <= 0) continue;
+			size_t size = (size_t)maxArgumentSize;
+			if (sysctl((int[]){ CTL_KERN, KERN_PROCARGS2, pid }, 3, buffer, &size, NULL, 0) != 0 ||
+				size <= sizeof(int) || size > (size_t)maxArgumentSize) continue;
+			char *path = buffer + sizeof(int);
+			if (memchr(path, '\0', size - sizeof(int)) && strcmp(path, executablePath) == 0) {
 				kill(pid, signal);
 			}
 		}
