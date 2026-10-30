@@ -1228,6 +1228,7 @@ void killall(const char *executablePath, int signal)
 	free(info);
 }
 
+// 复制归档数据，保留首次读写错误。
 static int
 copy_data(struct archive *ar, struct archive *aw)
 {
@@ -1250,68 +1251,78 @@ copy_data(struct archive *ar, struct archive *aw)
 	}
 }
 
+// 创建目标目录并解析合法的路径别名，安全检查只约束归档内部链接。
+static int prepare_extraction_path(const char *path, char resolved[PATH_MAX])
+{
+	if (!path || !*path) return -1;
+	char directory[PATH_MAX];
+	if (strlcpy(directory, path, sizeof(directory)) >= sizeof(directory)) return -1;
+	for (char *p = directory + 1; *p; p++) {
+		if (*p != '/') continue;
+		*p = '\0';
+		int r = mkdir(directory, 0755);
+		*p = '/';
+		if (r != 0 && errno != EEXIST) return -1;
+	}
+	if (mkdir(directory, 0755) != 0 && errno != EEXIST) return -1;
+	struct stat st;
+	if (!realpath(directory, resolved) || stat(resolved, &st) != 0 || !S_ISDIR(st.st_mode)) return -1;
+	return 0;
+}
+
+// 解压失败统一释放资源，任何条目写入失败均不得报告成功。
 int libarchive_unarchive(const char *fileToExtract, const char *extractionPath)
 {
-	struct archive *a;
-	struct archive *ext;
-	struct archive_entry *entry;
-	int flags;
-	int r;
+	int result = 1;
+	struct archive *a = archive_read_new();
+	struct archive *ext = archive_write_disk_new();
+	struct archive_entry *entry = NULL;
+	char destination[PATH_MAX];
+	if (!a || !ext || !fileToExtract || prepare_extraction_path(extractionPath, destination) != 0) goto cleanup;
 
-	/* Select which attributes we want to restore. */
-	flags = ARCHIVE_EXTRACT_TIME;
-	flags |= ARCHIVE_EXTRACT_PERM;
-	flags |= ARCHIVE_EXTRACT_ACL;
-	flags |= ARCHIVE_EXTRACT_FFLAGS;
-	flags |= ARCHIVE_EXTRACT_OWNER;
+	int flags = ARCHIVE_EXTRACT_TIME | ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_ACL |
+		ARCHIVE_EXTRACT_FFLAGS | ARCHIVE_EXTRACT_OWNER |
+		ARCHIVE_EXTRACT_SECURE_SYMLINKS | ARCHIVE_EXTRACT_SECURE_NODOTDOT;
+	if (archive_read_support_format_all(a) != ARCHIVE_OK ||
+		archive_read_support_filter_all(a) != ARCHIVE_OK ||
+		archive_write_disk_set_options(ext, flags) != ARCHIVE_OK ||
+		archive_write_disk_set_standard_lookup(ext) != ARCHIVE_OK ||
+		archive_read_open_filename(a, fileToExtract, 10240) != ARCHIVE_OK) goto cleanup;
 
-	a = archive_read_new();
-	archive_read_support_format_all(a);
-	archive_read_support_filter_all(a);
-	ext = archive_write_disk_new();
-	archive_write_disk_set_options(ext, flags);
-	archive_write_disk_set_standard_lookup(ext);
-	if ((r = archive_read_open_filename(a, fileToExtract, 10240)))
-			return 1;
 	for (;;) {
-			r = archive_read_next_header(a, &entry);
-			if (r == ARCHIVE_EOF)
-					break;
-			if (r < ARCHIVE_OK)
-					fprintf(stderr, "%s\n", archive_error_string(a));
-			if (r < ARCHIVE_WARN)
-					return 1;
-
-			const char *currentFile = archive_entry_pathname(entry);
-			char outputPath[PATH_MAX];
-			strlcpy(outputPath, extractionPath, PATH_MAX);
-			strlcat(outputPath, "/", PATH_MAX);
-			strlcat(outputPath, currentFile, PATH_MAX);
-
-			archive_entry_set_pathname(entry, outputPath);
-			
-			r = archive_write_header(ext, entry);
-			if (r < ARCHIVE_OK)
-					fprintf(stderr, "%s\n", archive_error_string(ext));
-			else if (archive_entry_size(entry) > 0) {
-					r = copy_data(a, ext);
-					if (r < ARCHIVE_OK)
-							fprintf(stderr, "%s\n", archive_error_string(ext));
-					if (r < ARCHIVE_WARN)
-							return 1;
-			}
-			r = archive_write_finish_entry(ext);
-			if (r < ARCHIVE_OK)
-					fprintf(stderr, "%s\n", archive_error_string(ext));
-			if (r < ARCHIVE_WARN)
-					return 1;
+		int r = archive_read_next_header(a, &entry);
+		if (r == ARCHIVE_EOF) break;
+		if (r != ARCHIVE_OK) goto cleanup;
+		const char *path = archive_entry_pathname(entry);
+		if (!path || path[0] == '/') goto cleanup;
+		char outputPath[PATH_MAX];
+		int n = snprintf(outputPath, sizeof(outputPath), "%s/%s", destination, path);
+		if (n < 0 || (size_t)n >= sizeof(outputPath)) goto cleanup;
+		archive_entry_set_pathname(entry, outputPath);
+		// 硬链接目标也必须指向本次解压目录。
+		const char *hardlink = archive_entry_hardlink(entry);
+		if (hardlink) {
+			if (hardlink[0] == '/') goto cleanup;
+			char target[PATH_MAX];
+			n = snprintf(target, sizeof(target), "%s/%s", destination, hardlink);
+			if (n < 0 || (size_t)n >= sizeof(target)) goto cleanup;
+			archive_entry_set_hardlink(entry, target);
+		}
+		if (archive_write_header(ext, entry) != ARCHIVE_OK) goto cleanup;
+		if (archive_entry_size(entry) > 0 && copy_data(a, ext) != ARCHIVE_OK) goto cleanup;
+		if (archive_write_finish_entry(ext) != ARCHIVE_OK) goto cleanup;
 	}
-	archive_read_close(a);
-	archive_read_free(a);
-	archive_write_close(ext);
-	archive_write_free(ext);
-	
-	return 0;
+	result = 0;
+cleanup:
+	if (a) {
+		if (archive_read_close(a) != ARCHIVE_OK) result = 1;
+		if (archive_read_free(a) != ARCHIVE_OK) result = 1;
+	}
+	if (ext) {
+		if (archive_write_close(ext) != ARCHIVE_OK) result = 1;
+		if (archive_write_free(ext) != ARCHIVE_OK) result = 1;
+	}
+	return result;
 }
 
 
