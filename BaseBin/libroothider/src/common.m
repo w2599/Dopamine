@@ -11,6 +11,9 @@
 #include <sys/proc.h>
 #include <sys/mount.h>
 #include <mach-o/dyld.h>
+#include <mach-o/fat.h>
+#include <choma/Fat.h>
+#include <choma/Host.h>
 #include <sys/proc_info.h>
 #include <dispatch/dispatch.h>
 
@@ -470,47 +473,57 @@ char* generate_sandbox_extensions(audit_token_t *processToken, bool writable)
     return sandboxExtensionsOut;
 }
 
-int randomizeAndLoadBasebinTrustcache(const char* basebinPath)
+// 收集宿主可加载的 basebin 文件，签名失败不得被当作普通资源跳过。
+int randomizeAndLoadBasebinTrustcache(const char *basebinPath)
 {
-    cdhash_t* basebins_cdhashes=NULL;
-    uint32_t basebins_cdhashesCount=0;
-
-    NSDirectoryEnumerator<NSURL *> *directoryEnumerator = [[NSFileManager defaultManager] enumeratorAtURL:[NSURL fileURLWithPath:@(basebinPath)] includingPropertiesForKeys:nil options:0 errorHandler:nil];
-    if(!directoryEnumerator) {
-        return -1;
-    }
-    for(NSURL* fileURL in directoryEnumerator)
-    {
-        NSNumber* isFile = nil;
-        [fileURL getResourceValue:&isFile forKey:NSURLIsRegularFileKey error:nil];
-        if(!isFile || !isFile.boolValue) continue;
-
-        cdhash_t cdhash={0};
-        if(ensure_randomized_cdhash(fileURL.path.fileSystemRepresentation, cdhash) == 0) {
-            basebins_cdhashes = realloc(basebins_cdhashes, (basebins_cdhashesCount+1) * sizeof(cdhash_t));
-            memcpy(&basebins_cdhashes[basebins_cdhashesCount], cdhash, sizeof(cdhash_t));
-            basebins_cdhashesCount++;
+    cdhash_t *hashes = NULL;
+    uint32_t count = 0;
+    __block bool enumerationFailed = false;
+    NSDirectoryEnumerator<NSURL *> *enumerator = [NSFileManager.defaultManager enumeratorAtURL:[NSURL fileURLWithPath:@(basebinPath)] includingPropertiesForKeys:@[NSURLIsRegularFileKey] options:0 errorHandler:^BOOL(NSURL *url, NSError *error) {
+        enumerationFailed = true;
+        return NO;
+    }];
+    if (!enumerator) return -1;
+    int result = -1;
+    for (NSURL *url in enumerator) {
+        struct stat st;
+        if (lstat(url.path.fileSystemRepresentation, &st) != 0) goto cleanup;
+        if (!S_ISREG(st.st_mode)) continue;
+        int fd = open(url.path.fileSystemRepresentation, O_RDONLY | O_CLOEXEC);
+        if (fd < 0) goto cleanup;
+        uint32_t magic = 0;
+        ssize_t size = 0;
+        while (size < sizeof(magic)) {
+            ssize_t n = read(fd, (char *)&magic + size, sizeof(magic) - size);
+            if (n < 0 && errno == EINTR) continue;
+            if (n < 0) { size = -1; break; }
+            if (n == 0) break;
+            size += n;
         }
+        close(fd);
+        if (size < 0) goto cleanup;
+        if (size != sizeof(magic) || (magic != MH_MAGIC && magic != MH_CIGAM && magic != MH_MAGIC_64 && magic != MH_CIGAM_64 &&
+            magic != FAT_MAGIC && magic != FAT_CIGAM && magic != FAT_MAGIC_64 && magic != FAT_CIGAM_64)) continue;
+        Fat *fat = fat_init_from_path(url.path.fileSystemRepresentation);
+        if (!fat) goto cleanup;
+        bool supported = fat_find_preferred_slice(fat) != NULL;
+        fat_free(fat);
+        if (!supported) continue;
+        cdhash_t hash;
+        if (ensure_randomized_cdhash(url.path.fileSystemRepresentation, hash) != 0 || count == UINT32_MAX) goto cleanup;
+        cdhash_t *expanded = realloc(hashes, ((size_t)count + 1) * sizeof(cdhash_t));
+        if (!expanded) goto cleanup;
+        hashes = expanded;
+        memcpy(hashes[count++], hash, sizeof(hash));
     }
-
-    if(!basebins_cdhashes) {
-        return -2;
-    }
-
-    trustcache_file_v1 *basebinTcFile = NULL;
-    int r1 = trustcache_file_build_from_cdhashes(basebins_cdhashes, basebins_cdhashesCount, &basebinTcFile);
-    free(basebins_cdhashes);
-    if (r1 != 0) {
-        return -3;
-    }
-
-    int r2 = trustcache_file_upload_with_uuid(basebinTcFile, BASEBIN_TRUSTCACHE_UUID);
-    free(basebinTcFile);
-    if (r2 != 0) {
-        return -4;
-    }
-
-    return 0;
+    if (enumerationFailed || !count) goto cleanup;
+    trustcache_file_v1 *file = NULL;
+    result = trustcache_file_build_from_cdhashes(hashes, count, &file);
+    if (result == 0) result = trustcache_file_upload_with_uuid(file, BASEBIN_TRUSTCACHE_UUID);
+    free(file);
+cleanup:
+    free(hashes);
+    return result;
 }
 
 kern_return_t bootstrap_look_up(mach_port_t port, const char *service, mach_port_t *server_port);
