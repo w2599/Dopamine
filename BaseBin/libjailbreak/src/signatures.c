@@ -21,6 +21,7 @@
 
 #include <libroothider/libroothider.h>
 
+// 判断宿主是否可能映射该架构，旧 arm64e ABI 仅允许非主程序。
 bool macho_is_mappable(MachO *macho)
 {
 	// Determine if there is any case in which the macho could be mapped
@@ -38,7 +39,7 @@ bool macho_is_mappable(MachO *macho)
 
 	cpu_type_t cputype = header->cputype;
 	cpu_subtype_t cpusubtype = header->cpusubtype;
-	bool isLibrary = (header->filetype == MH_EXECUTE);
+	bool isLibrary = (header->filetype != MH_EXECUTE);
 
 	if (cputype != CPU_TYPE_ARM64) return false;
 
@@ -87,92 +88,99 @@ bool code_signature_calculate_adhoc_cdhash(CS_SuperBlob *superblob, cdhash_t cdh
 	return isAdhocSigned;
 }
 
-bool macho_parse_code_signature(MachO *macho, cdhash_t cdhashOut)
+// 返回 1 表示需信任的 adhoc 签名，0 表示无需处理，-1 表示读取或解析失败。
+static int macho_collect_adhoc_cdhash(MachO *macho, cdhash_t hash)
 {
-	bool isAdhocSigned = false;
-
-	CS_SuperBlob *superblob = macho_read_code_signature(macho);
-	if (superblob) {
-		isAdhocSigned = code_signature_calculate_adhoc_cdhash(superblob, cdhashOut);
-		free(superblob);
-	}
-
-	return isAdhocSigned;
-}
-
-void fat_collect_untrusted_cdhashes(Fat *fat, cdhash_t **cdhashesOut, uint32_t *cdhashCountOut)
-{
-/*************************************** roothide specfic *************************************/
-FileStreamContext *context = (FileStreamContext *)fat->stream->context;
-int fd = context->fd;
-
-static char __thread filepath[PATH_MAX] = {0};
-if(fcntl(fd, F_GETPATH, filepath) != 0) {
-	JBLogError("Failed to get file path for fd %d", fd);
-	return;
-}
-if(string_has_prefix(filepath, "/private/preboot/Cryptexes/")) {
-	JBLogDebug("Skipping Cryptexes file: %s", filepath);
-	return;
-}
-if(isRemovableBundlePath(filepath) && !hasTrollstoreLiteMarker(filepath) && !hasJailFoolsMarker(filepath)) {
-	// ignore adhoc signed apps(removable system apps or other stuffs) which is not installed via tslite
-	JBLogDebug("ignoring addhoc signed app: %s\n", filepath);
-	return;
-}
-/*************************************** roothide specfic *************************************/
-
-	__block cdhash_t *cdhashes = NULL;
-	__block uint32_t cdhashCount = 0;
-	fat_enumerate_slices(fat, ^(MachO *macho, bool *stop) {
-		if (macho_is_mappable(macho)) {
-			cdhash_t cdhash;
-			if (macho_parse_code_signature(macho, cdhash)) {
-				if (!is_cdhash_trustcached(cdhash)) {
-
-
-/*************************************** roothide specfic *************************************/
-if(ensure_randomized_cdhash_for_slice(filepath, macho->archDescriptor.offset, cdhash) != 0) {
-	JBLogError("Failed to ensure randomized cdhash for %s", filepath);
-	return;
-}
-/**************************************** roothide specfic *************************************/
-
-
-					cdhashCount++;
-					cdhashes = realloc(cdhashes, cdhashCount * sizeof(cdhash_t));
-					memcpy(cdhashes[cdhashCount-1], cdhash, sizeof(cdhash));
-				}
-			}
-		}
+	__block bool hasSignature = false;
+	int r = macho_enumerate_load_commands(macho, ^(struct load_command command, uint64_t offset, void *data, bool *stop) {
+		if (command.cmd == LC_CODE_SIGNATURE) { hasSignature = true; *stop = true; }
 	});
-
-	*cdhashesOut = cdhashes;
-	*cdhashCountOut = cdhashCount;
-}
-
-void file_collect_untrusted_cdhashes(int fd, cdhash_t **cdhashesOut, uint32_t *cdhashCountOut)
-{
-	MemoryStream *s = file_stream_init_from_file_descriptor(fd, 0, FILE_STREAM_SIZE_AUTO, 0);
-	if (!s) return;
-
-	Fat *fat = fat_init_from_memory_stream(s);
-	if (!fat) {
-		memory_stream_free(s);
-		return;
+	if (r != 0) return -1;
+	if (!hasSignature) return 0;
+	CS_SuperBlob *blob = macho_read_code_signature(macho);
+	if (!blob) return -1;
+	CS_DecodedSuperBlob *decoded = csd_superblob_decode(blob);
+	free(blob);
+	if (!decoded) return -1;
+	int result = 0;
+	if (csd_superblob_is_adhoc_signed(decoded)) {
+		result = csd_superblob_calculate_best_cdhash(decoded, hash, NULL) == 0 ? 1 : -1;
 	}
-
-	fat_collect_untrusted_cdhashes(fat, cdhashesOut, cdhashCountOut);
-
-	fat_free(fat);
+	csd_superblob_free(decoded);
+	return result;
 }
 
-void file_collect_untrusted_cdhashes_by_path(const char *path, cdhash_t **cdhashesOut, uint32_t *cdhashCountOut)
+// 保留已有布尔接口，收集流程使用上面的三态接口传播错误。
+bool macho_parse_code_signature(MachO *macho, cdhash_t hash)
 {
+	return macho_collect_adhoc_cdhash(macho, hash) == 1;
+}
+
+// 收集全部可映射切片；任一修改失败都丢弃部分结果并返回错误。
+int fat_collect_untrusted_cdhashes(Fat *fat, cdhash_t **cdhashesOut, uint32_t *cdhashCountOut)
+{
+	if (!cdhashesOut || !cdhashCountOut) return -1;
+	*cdhashesOut = NULL;
+	*cdhashCountOut = 0;
+	if (!fat || !fat->stream || !fat->stream->context) return -1;
+	FileStreamContext *context = (FileStreamContext *)fat->stream->context;
+	char filepath[PATH_MAX] = {0};
+	if (fcntl(context->fd, F_GETPATH, filepath) != 0) return -1;
+	if (string_has_prefix(filepath, "/private/preboot/Cryptexes/") ||
+		(isRemovableBundlePath(filepath) && !hasTrollstoreLiteMarker(filepath) && !hasJailFoolsMarker(filepath))) return 0;
+
+	const char *filePath = filepath;
+	__block cdhash_t *cdhashes = NULL;
+	__block uint32_t count = 0;
+	__block int result = 0;
+	fat_enumerate_slices(fat, ^(MachO *macho, bool *stop) {
+		cdhash_t hash;
+		if (!macho_is_mappable(macho)) return;
+		int signatureResult = macho_collect_adhoc_cdhash(macho, hash);
+		if (signatureResult < 0) { result = -1; *stop = true; return; }
+		if (signatureResult == 0 || is_cdhash_trustcached(hash)) return;
+		if (ensure_randomized_cdhash_for_slice(filePath, macho->archDescriptor.offset, hash) != 0 || count == UINT32_MAX) {
+			result = -1;
+			*stop = true;
+			return;
+		}
+		cdhash_t *expanded = realloc(cdhashes, ((size_t)count + 1) * sizeof(cdhash_t));
+		if (!expanded) { result = -1; *stop = true; return; }
+		cdhashes = expanded;
+		memcpy(cdhashes[count++], hash, sizeof(hash));
+	});
+	if (result != 0) { free(cdhashes); return result; }
+	*cdhashesOut = cdhashes;
+	*cdhashCountOut = count;
+	return 0;
+}
+
+// 借用文件描述符解析并传递收集错误。
+int file_collect_untrusted_cdhashes(int fd, cdhash_t **cdhashesOut, uint32_t *cdhashCountOut)
+{
+	if (!cdhashesOut || !cdhashCountOut) return -1;
+	*cdhashesOut = NULL;
+	*cdhashCountOut = 0;
+	MemoryStream *stream = file_stream_init_from_file_descriptor(fd, 0, FILE_STREAM_SIZE_AUTO, 0);
+	if (!stream) return -1;
+	Fat *fat = fat_init_from_memory_stream(stream);
+	if (!fat) { memory_stream_free(stream); return -1; }
+	int result = fat_collect_untrusted_cdhashes(fat, cdhashesOut, cdhashCountOut);
+	fat_free(fat);
+	return result;
+}
+
+// 打开路径并在所有返回路径关闭描述符。
+int file_collect_untrusted_cdhashes_by_path(const char *path, cdhash_t **cdhashesOut, uint32_t *cdhashCountOut)
+{
+	if (!cdhashesOut || !cdhashCountOut) return -1;
+	*cdhashesOut = NULL;
+	*cdhashCountOut = 0;
 	int fd = open(path, O_RDONLY);
-	if (fd < 0) return;
-	file_collect_untrusted_cdhashes(fd, cdhashesOut, cdhashCountOut);
+	if (fd < 0) return -1;
+	int result = file_collect_untrusted_cdhashes(fd, cdhashesOut, cdhashCountOut);
 	close(fd);
+	return result;
 }
 
 void fat_collect_signatures(Fat *fat, struct siginfo **sigInfosOut, uint32_t *sigInfoCountOut)
